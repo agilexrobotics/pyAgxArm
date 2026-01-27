@@ -46,11 +46,39 @@ print(end_effector.__doc__)
 
 # The following poses are for Piper and need to be replaced with Nero poses to run successfully on Nero.
 
-# robot.move_p([-0.160251, -0.043348, 0.6907249999999999, 1.117935745779928, 0.9272061651219876, 0.14817845349431857])
+# robot.set_motion_mode(robot.MOTION_MODE.P)
+# time.sleep(1)
+# robot.move_p([-0.4, -0.0, 0.4, 1.570823, 0.0, 0.0])
+# time.sleep(0.1)
+# robot.set_motion_mode(robot.MOTION_MODE.P)
+# wait_motion_done(robot, timeout=2.0)
+
+# robot.set_motion_mode(robot.MOTION_MODE.L)
+# robot.move_l([-0.4, -0.2, 0.4, 1.570823, 0.0, 0.0])
+# robot.set_motion_mode(robot.MOTION_MODE.L)
+# wait_motion_done(robot, timeout=2.5)
+
+# robot.move_l([-0.4, 0.2, 0.4, 1.570823, 0.0, 0.0])
+# robot.set_motion_mode(robot.MOTION_MODE.L)
+# wait_motion_done(robot, timeout=2.5)
+
+# start_pose = [-0.4, -0.2, 0.4, 1.570823, 0.0, 0.0]
+# mid_pose = [-0.4, -0.0, 0.42, 1.570823, 0.0, 0.0]
+# end_pose = [-0.4, 0.2, 0.4, 1.570823, 0.0, 0.0]
+# robot.set_motion_mode(robot.MOTION_MODE.C)
+# time.sleep(0.1)
+# robot.move_c(start_pose, mid_pose, end_pose)
+# time.sleep(0.1)
+# robot.set_motion_mode(robot.MOTION_MODE.C)
+# wait_motion_done(robot, timeout=5)
+
+# robot.set_motion_mode(robot.MOTION_MODE.J)
+# robot.move_j([0.01] * 7)
+# # robot.move_j([0.0, 0.4, -0.0, 1.2, -0.0, 0.0, 0])
 # wait_motion_done(robot, timeout=5.0)
 
-# robot.move_j([0.0] * 7)
-# wait_motion_done(robot, timeout=5.0)
+# robot.set_motion_mode(robot.MOTION_MODE.JS)
+# robot.move_js([0] * 7)
 
 
 # -------------------------- reset ----------------------------
@@ -93,6 +121,30 @@ while True:
     print()
 
     time.sleep(0.005)
+
+
+# -------------------------- Motor torque measurements -------
+
+# robot.move_mit(1, 0.0, v_des=0.0, kp=0, kd=0, t_ff=0.8)
+
+# import numpy as np
+
+# data = []
+
+# while True:
+#     data.append(robot.get_motor_states(1).msg.torque)
+#     time.sleep(0.02)
+#     if len(data) > 100:
+#         break
+
+# data = np.mean(data)
+# print(data)
+
+
+# -------------------------- Master Arm --------------------------
+
+# robot.set_master_mode()
+# robot.set_slave_mode()
 
 
 # -------------------------- TCP ----------------------------
