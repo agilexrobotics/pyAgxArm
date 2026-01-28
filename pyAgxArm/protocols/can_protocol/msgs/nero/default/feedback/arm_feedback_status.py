@@ -235,7 +235,15 @@ class ArmMsgFeedbackStatus(AttributeBase):
             bit[6]: Joint 7 communication exception (0: normal, 1: abnormal)
             bit[7]: Reserved
     '''
-    
+    _fields_ = (
+        "ctrl_mode",
+        "arm_status",
+        "mode_feedback",
+        "teach_status",
+        "motion_status",
+        "trajectory_num",
+        "err_status",
+    )
     def __init__(self,
                  ctrl_mode: int = 0,
                  arm_status: int = 0,
