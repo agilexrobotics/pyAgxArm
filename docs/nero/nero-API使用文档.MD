@@ -976,7 +976,7 @@ while not robot.enable():
     time.sleep(0.01)
 
 robot.set_speed_percent(100)
-robot.move_p([0.1, 0.0, 0.3, 0.0, 1.570796326794896619, 0.0])
+robot.move_p([-0.4, -0.0, 0.4, 1.570823, 0.0, 0.0])
 
 # 等待运动结束（带 5s 超时，避免无限等待）
 time.sleep(0.5)
@@ -995,3 +995,55 @@ while True:
 注意:
 
 如果连续执行该指令会覆盖上一次的目标值
+
+### 直线运动 move_l()
+
+- 功能说明:
+
+该指令为发送一个目标法兰位姿，机械臂会根据当前位姿和目标位姿进行直线规划
+
+- 定义:
+
+```python
+move_l(self, pose: list[float]) -> None
+```
+
+- 参数说明:
+
+|名称|类型|说明|
+|---|---|---|
+|pose|list[float]|目标位姿 `[x, y, z, roll, pitch, yaw]`：`x, y, z` 为位置坐标（m，数值精度：1e-6）；`roll, pitch, yaw` 为姿态欧拉角（rad，分别绕 X/Y/Z 轴旋转，数值精度：1.74532925199e-5）|
+
+- 使用示例:
+
+```python
+import time
+from pyAgxArm import create_agx_arm_config, AgxArmFactory
+
+cfg = create_agx_arm_config(robot="nero", comm="can", channel="can0")
+robot = AgxArmFactory.create_arm(cfg)
+robot.connect()
+
+while not robot.enable():
+    time.sleep(0.01)
+
+robot.set_speed_percent(100)
+robot.move_l([-0.4, -0.2, 0.4, 1.570823, 0.0, 0.0])
+
+# 等待运动结束（带 5s 超时，避免无限等待）
+time.sleep(0.5)
+start_t = time.monotonic()
+while True:
+    status = robot.get_arm_status()
+    if status is not None and status.msg.motion_status == 0:
+        print("已到达目标位置")
+        break
+    if time.monotonic() - start_t > 5.0:
+        print("等待运动结束超时（5s）")
+        break
+    time.sleep(0.1)
+```
+
+注意:
+
+连续执行该指令虽然可以覆盖上一次的目标，但是由于底层每接收到新的点位，都需要重新进行直线规划，因此不能够使用该指令连续发目标点

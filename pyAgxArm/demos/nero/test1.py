@@ -30,7 +30,7 @@ print(end_effector.__doc__)
 
 # -------------------------- Basic ---------------------------
 
-# robot.set_normal_mode()
+robot.set_normal_mode()
 
 # while not robot.enable():
 #     time.sleep(0.01)
@@ -49,7 +49,10 @@ print(end_effector.__doc__)
 # robot.move_p([-0.4, -0.0, 0.4, 1.570823, 0.0, 0.0])
 # wait_motion_done(robot, timeout=5.0)
 
-# robot.move_j([0.0] * 7)
+# robot.move_l([-0.4, -0.2, 0.4, 1.570823, 0.0, 0.0])
+# wait_motion_done(robot, timeout=5.0)
+
+# robot.move_j([0.01] * 7)
 # wait_motion_done(robot, timeout=5.0)
 
 

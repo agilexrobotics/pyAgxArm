@@ -721,6 +721,36 @@ class Driver(ArmDriverAbstract):
         self.set_motion_mode('j')
         self._send_msgs(msgs)
 
+    def move_l(self, pose: List[float]):
+        """Move the robotic arm flange to target pose in Cartesian space with
+        linear motion.
+
+        Parameters
+        ----------
+        `pose`: list[float]
+        - `list[float]` - > `[x, y, z, roll, pitch, yaw]`
+        - `x, y, z`: Position coordinates in meters.
+            (Numerical precision: 1e-6 m)
+        - `roll, pitch, yaw`: Rotation angles around X, Y, Z axes respectively
+            in radians. (Numerical precision: 1.74532925199e-5 rad)
+          - `roll`, `yaw` must be within `[-pi, pi]`
+          - `pitch` must be within `[-pi/2, pi/2]`
+
+        Raises
+        ------
+        ValueError
+            If pose is not a list or has incorrect length (not 6 elements).
+
+            If `roll`, `yaw` is outside `[-pi, pi]` or `pitch` is outside
+            `[-pi/2, pi/2]`.
+        """
+        # Prepare control messages
+        msgs = self._deal_move_p_msgs(pose)
+
+        # Set motion mode and send commands
+        self.set_motion_mode('l')
+        self._send_msgs(msgs)
+
     # -------------------------- Master-Slave --------------------------
 
     def _set_master_slave_config(
