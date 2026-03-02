@@ -58,7 +58,6 @@ __all__ = [
     'ArmMsgParamEnquiryAndConfig',
     'ArmMsgEndVelAccParamConfig',
     'ArmMsgCrashProtectionRatingConfig',
-    # Gripper messages moved to msgs/agx_gripper
     'ArmMsgJointMitCtrl',
     'ArmMsgJointMitCtrl1',
     'ArmMsgJointMitCtrl2',

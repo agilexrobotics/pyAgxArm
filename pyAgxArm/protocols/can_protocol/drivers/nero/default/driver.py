@@ -20,6 +20,7 @@ from ....msgs.nero.default import (
     ArmMsgMotorEnableDisableConfig,
     ArmMsgMotionCtrl,
     ArmMsgMasterSlaveModeConfig,
+    ArmMsgFeedbackMasterJointStates,
 )
 
 
@@ -1051,3 +1052,64 @@ class Driver(ArmDriverAbstract):
         self._set_mode()
         self._msg_mode.enable_can_push = 0x00
         self._set_master_slave_config(linkage_config=0xFC)
+
+    def get_master_joint_angles(self):
+        """Get the master arm joint angles,
+        can be used to control the slave arm.
+
+        Returns
+        -------
+        MessageAbstract[list[float]] | None
+            The joint angles feedback of the master arm.
+            If the joint angles are not available, return None.
+
+        Message
+        -------
+        `list[float]`: joint angles, unit: rad
+
+        Examples
+        --------
+        >>> mja = robot.get_master_joint_angles()
+        >>> if mja is not None:
+        >>>     print(mja.msg)
+        >>>     print(mja.hz, mja.timestamp)
+        """
+        master_joint_angles: Optional[
+            MessageAbstract[ArmMsgFeedbackMasterJointStates]
+        ] = None
+        if getattr(self, "_master_joint_angles", None) is None:
+            self._master_joint_angles = MessageAbstract(
+                msg=list([0.0] * self._JOINT_NUMS),
+                msg_type=ArmMsgFeedbackMasterJointStates.type_,
+            )
+        if getattr(self._parser, "master_joint_1", None) is not None:
+            master_joint_angles = self._parser.master_joint_1
+            self._master_joint_angles.msg[0] = master_joint_angles.msg.joint_1
+        if getattr(self._parser, "master_joint_2", None) is not None:
+            master_joint_angles = self._parser.master_joint_2
+            self._master_joint_angles.msg[1] = master_joint_angles.msg.joint_2
+        if getattr(self._parser, "master_joint_3", None) is not None:
+            master_joint_angles = self._parser.master_joint_3
+            self._master_joint_angles.msg[2] = master_joint_angles.msg.joint_3
+        if getattr(self._parser, "master_joint_4", None) is not None:
+            master_joint_angles = self._parser.master_joint_4
+            self._master_joint_angles.msg[3] = master_joint_angles.msg.joint_4
+        if getattr(self._parser, "master_joint_5", None) is not None:
+            master_joint_angles = self._parser.master_joint_5
+            self._master_joint_angles.msg[4] = master_joint_angles.msg.joint_5
+        if getattr(self._parser, "master_joint_6", None) is not None:
+            master_joint_angles = self._parser.master_joint_6
+            self._master_joint_angles.msg[5] = master_joint_angles.msg.joint_6
+        if getattr(self._parser, "master_joint_7", None) is not None:
+            master_joint_angles = self._parser.master_joint_7
+            self._master_joint_angles.msg[6] = master_joint_angles.msg.joint_7
+        if master_joint_angles is not None:
+            self._master_joint_angles.timestamp = master_joint_angles.timestamp
+            self._master_joint_angles.hz = self._ctx.fps.get_fps(
+                master_joint_angles.msg_type)
+            if Validator.is_joints(
+                self._master_joint_angles.msg,
+                length=self._JOINT_NUMS
+            ):
+                return self._master_joint_angles
+        return None

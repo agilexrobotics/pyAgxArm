@@ -17,6 +17,13 @@ from ....msgs.nero.default import (
     ArmMsgFeedbackLowSpd7,
     ArmMsgFeedbackStatus,
     ArmMsgModeCtrl,
+    ArmMsgFeedbackMasterJointStates1,
+    ArmMsgFeedbackMasterJointStates2,
+    ArmMsgFeedbackMasterJointStates3,
+    ArmMsgFeedbackMasterJointStates4,
+    ArmMsgFeedbackMasterJointStates5,
+    ArmMsgFeedbackMasterJointStates6,
+    ArmMsgFeedbackMasterJointStates7,
 )
 from ...core.protocol_parser_abstract import DriverAPIOptions, DriverAPIProtoAdapter
 from ....msgs.core import StrStruct
@@ -70,6 +77,11 @@ class Codec(PiperCodec):
             * DEG2RAD
         )
 
+    def decode_master_joint_state_by_index(self, index: int) -> Callable[[object, bytearray], None]:
+        def decoder(m: AttributeBase, d: bytearray) -> None:
+            setattr(m, f"joint_{index}", nc.from_bytes_to_float(d))
+        return decoder
+
     def encode_151_mode_ctrl(self, msg: ArmMsgModeCtrl):
         d = super().encode_151_mode_ctrl(msg)
         d[6] = nc.ConvertToList_8bit(msg.enable_can_push, False)[0]
@@ -93,6 +105,14 @@ class Parser(PiperParser):
         joint_7: Optional[MessageAbstract[ArmMsgFeedbackJointStates7]]
         motor_state_7: Optional[MessageAbstract[ArmMsgFeedbackHighSpd7]]
         driver_state_7: Optional[MessageAbstract[ArmMsgFeedbackLowSpd7]]
+
+        master_joint_1: Optional[MessageAbstract[ArmMsgFeedbackMasterJointStates1]]
+        master_joint_2: Optional[MessageAbstract[ArmMsgFeedbackMasterJointStates2]]
+        master_joint_3: Optional[MessageAbstract[ArmMsgFeedbackMasterJointStates3]]
+        master_joint_4: Optional[MessageAbstract[ArmMsgFeedbackMasterJointStates4]]
+        master_joint_5: Optional[MessageAbstract[ArmMsgFeedbackMasterJointStates5]]
+        master_joint_6: Optional[MessageAbstract[ArmMsgFeedbackMasterJointStates6]]
+        master_joint_7: Optional[MessageAbstract[ArmMsgFeedbackMasterJointStates7]]
 
     def __init__(self, fps_manager: FPSManager, codec: Optional[Codec] = None):
         # Reuse Piper Parser init; only replace codec with Nero version.
@@ -134,6 +154,43 @@ class Parser(PiperParser):
                     "arm_status",
                     ArmMsgFeedbackStatus,
                     self._codec.decode_2A1_status
+                ),
+
+                # 主臂关节消息
+                0x501: (
+                    "master_joint_1",
+                    ArmMsgFeedbackMasterJointStates1,
+                    self._codec.decode_master_joint_state_by_index(1)
+                ),
+                0x502: (
+                    "master_joint_2",
+                    ArmMsgFeedbackMasterJointStates2,
+                    self._codec.decode_master_joint_state_by_index(2)
+                ),
+                0x503: (
+                    "master_joint_3",
+                    ArmMsgFeedbackMasterJointStates3,
+                    self._codec.decode_master_joint_state_by_index(3)
+                ),
+                0x504: (
+                    "master_joint_4",
+                    ArmMsgFeedbackMasterJointStates4,
+                    self._codec.decode_master_joint_state_by_index(4)
+                ),
+                0x505: (
+                    "master_joint_5",
+                    ArmMsgFeedbackMasterJointStates5,
+                    self._codec.decode_master_joint_state_by_index(5)
+                ),
+                0x506: (
+                    "master_joint_6",
+                    ArmMsgFeedbackMasterJointStates6,
+                    self._codec.decode_master_joint_state_by_index(6)
+                ),
+                0x507: (
+                    "master_joint_7",
+                    ArmMsgFeedbackMasterJointStates7,
+                    self._codec.decode_master_joint_state_by_index(7)
                 ),
             }
         )

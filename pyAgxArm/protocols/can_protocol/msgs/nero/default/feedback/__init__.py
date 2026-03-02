@@ -30,6 +30,16 @@ from .arm_feedback_high_spd import ArmMsgFeedbackHighSpd, ArmMsgFeedbackAllHighS
 from .arm_feedback_joint_states import ArmMsgFeedbackJointStates, ArmMsgFeedbackJointStates7
 from .arm_feedback_low_spd import ArmMsgFeedbackLowSpd, ArmMsgFeedbackAllLowSpd, ArmMsgFeedbackLowSpd7
 from .arm_feedback_status import ArmMsgFeedbackStatus, ArmMsgFeedbackStatusEnum
+from .arm_feedback_master_joint_states import (
+    ArmMsgFeedbackMasterJointStates,
+    ArmMsgFeedbackMasterJointStates1,
+    ArmMsgFeedbackMasterJointStates2,
+    ArmMsgFeedbackMasterJointStates3,
+    ArmMsgFeedbackMasterJointStates4,
+    ArmMsgFeedbackMasterJointStates5,
+    ArmMsgFeedbackMasterJointStates6,
+    ArmMsgFeedbackMasterJointStates7,
+)
 
 __all__ = [
     # 反馈
@@ -68,7 +78,14 @@ __all__ = [
     'ArmMsgFeedbackLowSpd5',
     'ArmMsgFeedbackLowSpd6',
     'ArmMsgFeedbackLowSpd7',
-    # Gripper messages moved to msgs/agx_gripper
     'ArmMsgFeedbackRespSetInstruction',
     'ArmMsgFeedbackFirmware',
+    'ArmMsgFeedbackMasterJointStates',
+    'ArmMsgFeedbackMasterJointStates1',
+    'ArmMsgFeedbackMasterJointStates2',
+    'ArmMsgFeedbackMasterJointStates3',
+    'ArmMsgFeedbackMasterJointStates4',
+    'ArmMsgFeedbackMasterJointStates5',
+    'ArmMsgFeedbackMasterJointStates6',
+    'ArmMsgFeedbackMasterJointStates7',
 ]

@@ -1064,6 +1064,8 @@ cfg = create_agx_arm_config(robot="piper", comm="can", channel="can0")
 robot = AgxArmFactory.create_arm(cfg)
 robot.connect()
 
+robot.set_master_mode()
+
 while True:
     mja = robot.get_master_joint_angles()
     if mja is not None:

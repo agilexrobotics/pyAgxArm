@@ -106,6 +106,8 @@ while True:
     # print(robot.get_joint_angles())
     # print(robot.get_flange_pose())
 
+    # print(robot.get_master_joint_angles())
+
     # print(robot.get_driver_states(1))
     # print(robot.get_motor_states(1))
     # print(robot.get_joint_enable_status(1))

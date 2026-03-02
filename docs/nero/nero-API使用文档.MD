@@ -822,6 +822,44 @@ robot.connect()
 robot.set_slave_mode()
 ```
 
+### 读取主臂关节角度消息 get_master_joint_angles()
+
+- 功能说明:
+
+获取主臂关节角度消息，用于控制从臂
+
+- 定义:
+
+```python
+get_master_joint_angles(self) -> MessageAbstract[list[float]] | None
+```
+
+- 返回值:
+
+类型：`MessageAbstract[list[float]] | None`
+
+`MessageAbstract[list[float]].msg` 为长度 7 的 `list[float]`：`[j1, j2, j3, j4, j5, j6, j7]`，单位：rad。
+
+- 使用示例:
+
+```python
+import time
+from pyAgxArm import create_agx_arm_config, AgxArmFactory
+
+cfg = create_agx_arm_config(robot="nero", comm="can", channel="can0")
+robot = AgxArmFactory.create_arm(cfg)
+robot.connect()
+
+robot.set_master_mode()
+
+while True:
+    mja = robot.get_master_joint_angles()
+    if mja is not None:
+        print(mja.msg) # list
+        print(mja.hz, mja.timestamp)
+    time.sleep(0.005)
+```
+
 ## 机械臂控制相关
 
 ### 使能机械臂 enable()

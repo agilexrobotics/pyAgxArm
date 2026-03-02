@@ -361,4 +361,51 @@ class NumericCodec():
         Convert a byte string to an int type, with big-endian byte order by default.
         '''
         return int.from_bytes(bytes[first_index:second_index], byteorder=byteorder)
+
+    @staticmethod
+    def from_bytes_to_float(byte_data: bytearray, byteorder: Literal['big', 'little'] = 'little') -> float:
+        """
+        将长度为4的字节数组转换为浮点数
+        :param byte_data: 字节数组（或 bytes 对象）
+        :param byteorder: 'big' 或 'little'
+        :return: 对应的浮点数
+        """
+        if len(byte_data) < 4:
+            raise ValueError("Byte array must contain at least 4 bytes")
+        fmt = '>' if byteorder == 'big' else '<'
+        return struct.unpack(fmt + 'f', byte_data[:4])[0]
     
+    @staticmethod
+    def from_float_to_bytes(float_data: float, byteorder: Literal['big', 'little'] = 'little') -> bytearray:
+        """
+        将浮点数转换为长度为4的字节数组
+        :param float_data: 浮点数
+        :param byteorder: 'big' 或 'little'
+        :return: 对应的字节数组（bytearray）
+        """
+        fmt = '>' if byteorder == 'big' else '<'
+        return bytearray(struct.pack(fmt + 'f', float_data))
+    
+    @staticmethod
+    def from_bytes_to_double(byte_data: bytearray, byteorder: Literal['big', 'little'] = 'little') -> float:
+        """
+        将长度为8的字节数组转换为双精度浮点数
+        :param byte_data: 字节数组（或 bytes 对象）
+        :param byteorder: 'big' 或 'little'
+        :return: 对应的双精度浮点数
+        """
+        if len(byte_data) < 8:
+            raise ValueError("Byte array must contain at least 8 bytes")
+        fmt = '>' if byteorder == 'big' else '<'
+        return struct.unpack(fmt + 'd', byte_data[:8])[0]
+
+    @staticmethod
+    def from_double_to_bytes(double_data: float, byteorder: Literal['big', 'little'] = 'little') -> bytearray:
+        """
+        将双精度浮点数转换为长度为8的字节数组
+        :param double_data: 双精度浮点数
+        :param byteorder: 'big' 或 'little'
+        :return: 对应的字节数组（bytearray）
+        """
+        fmt = '>' if byteorder == 'big' else '<'
+        return bytearray(struct.pack(fmt + 'd', double_data))
