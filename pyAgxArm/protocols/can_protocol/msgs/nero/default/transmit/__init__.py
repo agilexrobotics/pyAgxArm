@@ -35,6 +35,7 @@ from .arm_mode_ctrl import ArmMsgModeCtrl
 from .arm_motor_angle_limit_max_spd_config import ArmMsgMotorAngleLimitMaxSpdSet
 from .arm_motor_enable_disable import ArmMsgMotorEnableDisableConfig
 from .arm_search_motor_max_angle_spd_acc_limit import ArmMsgSearchMotorMaxAngleSpdAccLimit
+from .arm_cpv_settings_and_queries import ArmMsgCPVSettingsAndQueries7
 
 __all__ = [
     # 发送
@@ -67,4 +68,5 @@ __all__ = [
     'ArmMsgJointMitCtrl6',
     'ArmMsgJointMitCtrl7',
     'ArmMsgReqFirmware',
+    'ArmMsgCPVSettingsAndQueries7',
 ]

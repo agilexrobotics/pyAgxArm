@@ -168,3 +168,111 @@ def test_nero_get_firmware_with_realistic_hex():
         arm.disconnect()
     finally:
         device.stop()
+
+
+def test_nero_driver_virtual_can_cpv_joint7_and_round_trip():
+    channel = new_virtual_channel("ci_nero_cpv")
+    device = NeroCanSlave(channel=channel)
+    device.start()
+    try:
+        arm = _make_nero_arm(NeroFW.DEFAULT, channel)
+        arm.connect()
+        arm.set_motion_mode(arm.OPTIONS.MOTION_MODE.CPV)
+        assert wait_until(
+            lambda: any(
+                f.arbitration_id == 0x151 and len(f.data) >= 2 and f.data[1] == 0x05
+                for f in device.host_frames
+            ),
+            timeout=1.0,
+        )
+
+        pos7 = 0.087
+        n0 = len(device.host_frames)
+        arm.move_cpv_pos(7, pos7)
+        assert wait_until(
+            lambda: any(
+                f.arbitration_id == 0x187 for f in device.host_frames[n0:]
+            ),
+            timeout=1.0,
+        )
+
+        got7 = arm.get_cpv_pos(7, timeout=1.0, min_interval=0.0)
+        assert got7 is not None
+        assert abs(got7 - pos7) < 1e-4
+
+        arm.move_cpv_vel(1, 0.01)
+        g1 = arm.get_cpv_vel(1, timeout=1.0, min_interval=0.0)
+        assert g1 is not None and abs(g1 - 0.01) < 1e-6
+
+        assert arm.set_cpv_cv(4, 0.5, timeout=1.0)
+        cv = arm.get_cpv_cv(4, timeout=1.0, min_interval=0.0)
+        assert cv is not None and abs(cv - 0.5) < 1e-6
+
+        n_cov = len(device.host_frames)
+        for ji in range(1, 8):
+            arm.get_cpv_pp(ji, timeout=1.0, min_interval=0.0)
+        cpv_tx = {
+            f.arbitration_id
+            for f in device.host_frames[n_cov:]
+            if 0x181 <= f.arbitration_id <= 0x187
+        }
+        assert cpv_tx == {0x181 + i for i in range(7)}
+        arm.disconnect()
+    finally:
+        device.stop()
+
+
+def test_nero_driver_virtual_can_cpv_timeout_when_slave_mutes_cpv():
+    channel = new_virtual_channel("ci_nero_cpv_to")
+    device = NeroCanSlave(channel=channel)
+    device.start()
+    try:
+        arm = _make_nero_arm(NeroFW.DEFAULT, channel)
+        arm.connect()
+        arm.set_motion_mode(arm.OPTIONS.MOTION_MODE.CPV)
+        device._cpv_reply_enabled = False
+        assert arm.get_cpv_kp(2, timeout=0.05, min_interval=0.0) is None
+        arm.disconnect()
+    finally:
+        device.stop()
+
+
+def test_nero_driver_virtual_can_cpv_each_public_api_once():
+    """对 Nero 驱动文档中的 CPV 公开接口各做一次成功调用（含第 7 轴 0x187）。"""
+    channel = new_virtual_channel("ci_nero_cpv_all")
+    device = NeroCanSlave(channel=channel)
+    device.start()
+    try:
+        arm = _make_nero_arm(NeroFW.DEFAULT, channel)
+        arm.connect()
+        arm.set_motion_mode("cpv")
+        to = 1.0
+        mi = 0.0
+
+        arm.move_cpv_pos(7, 0.04)
+        assert arm.get_cpv_pos(7, timeout=to, min_interval=mi) is not None
+
+        arm.move_cpv_vel(6, 0.025)
+        assert arm.get_cpv_vel(6, timeout=to, min_interval=mi) is not None
+
+        assert arm.set_cpv_acc(1, 1.05, timeout=to)
+        assert arm.get_cpv_acc(1, timeout=to, min_interval=mi) is not None
+
+        assert arm.set_cpv_dcc(2, 1.06, timeout=to)
+        assert arm.get_cpv_dcc(2, timeout=to, min_interval=mi) is not None
+
+        assert arm.set_cpv_cv(3, 0.42, timeout=to)
+        assert arm.get_cpv_cv(3, timeout=to, min_interval=mi) is not None
+
+        assert arm.set_cpv_pp(4, 1.15, timeout=to)
+        assert arm.get_cpv_pp(4, timeout=to, min_interval=mi) is not None
+
+        assert arm.set_cpv_kp(5, 0.88, timeout=to)
+        assert arm.get_cpv_kp(5, timeout=to, min_interval=mi) is not None
+
+        assert arm.set_cpv_ki(7, 0.19, timeout=to)
+        assert arm.get_cpv_ki(7, timeout=to, min_interval=mi) is not None
+
+        arm.disconnect()
+    finally:
+        device.stop()

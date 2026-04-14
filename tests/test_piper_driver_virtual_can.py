@@ -204,3 +204,123 @@ def test_piper_proprietary_apis_l2():
         arm.disconnect()
     finally:
         device.stop()
+
+
+def test_piper_driver_virtual_can_cpv_move_get_set_and_scaling():
+    channel = new_virtual_channel("ci_piper_cpv")
+    device = PiperCanSlave(channel=channel)
+    device.start()
+    try:
+        arm = _make_piper_arm(PiperFW.DEFAULT, channel)
+        arm.connect()
+        arm.set_motion_mode(arm.OPTIONS.MOTION_MODE.CPV)
+        assert wait_until(
+            lambda: any(
+                f.arbitration_id == 0x151 and len(f.data) >= 2 and f.data[1] == 0x05
+                for f in device.host_frames
+            ),
+            timeout=1.0,
+        )
+
+        pos = 0.12345
+        arm.move_cpv_pos(1, pos)
+        got_pos = arm.get_cpv_pos(1, timeout=1.0, min_interval=0.0)
+        assert got_pos is not None
+        assert abs(got_pos - pos) < 1e-4
+
+        vel = -0.02
+        arm.move_cpv_vel(2, vel)
+        got_sp = arm.get_cpv_vel(2, timeout=1.0, min_interval=0.0)
+        assert got_sp is not None
+        assert abs(got_sp - vel) < 1e-6
+
+        assert arm.set_cpv_acc(3, 1.25, timeout=1.0)
+        acc = arm.get_cpv_acc(3, timeout=1.0, min_interval=0.0)
+        assert acc is not None and abs(acc - 1.25) < 1e-6
+
+        cpv_ids = {f.arbitration_id for f in device.device_frames if 0x181 <= f.arbitration_id <= 0x186}
+        assert cpv_ids, "expected CPV TX/RX on 0x181–0x186"
+        arm.disconnect()
+    finally:
+        device.stop()
+
+
+def test_piper_driver_virtual_can_cpv_invalid_joint_and_timeout():
+    channel = new_virtual_channel("ci_piper_cpv_err")
+    device = PiperCanSlave(channel=channel)
+    device.start()
+    try:
+        arm = _make_piper_arm(PiperFW.DEFAULT, channel)
+        arm.connect()
+        arm.set_motion_mode(arm.OPTIONS.MOTION_MODE.CPV)
+
+        with pytest.raises(ValueError):
+            arm.get_cpv_pos(7, timeout=0.1, min_interval=0.0)
+
+        device._cpv_reply_enabled = False
+        assert arm.get_cpv_pos(1, timeout=0.05, min_interval=0.0) is None
+        arm.disconnect()
+    finally:
+        device.stop()
+
+
+def test_piper_driver_virtual_can_cpv_host_tx_ids_cover_joints():
+    channel = new_virtual_channel("ci_piper_cpv_ids")
+    device = PiperCanSlave(channel=channel)
+    device.start()
+    try:
+        arm = _make_piper_arm(PiperFW.DEFAULT, channel)
+        arm.connect()
+        arm.set_motion_mode(arm.OPTIONS.MOTION_MODE.CPV)
+        n0 = len(device.host_frames)
+        for ji in range(1, 7):
+            arm.get_cpv_pp(ji, timeout=1.0, min_interval=0.0)
+        ids = {
+            f.arbitration_id
+            for f in device.host_frames[n0:]
+            if 0x181 <= f.arbitration_id <= 0x186
+        }
+        assert ids == {0x181, 0x182, 0x183, 0x184, 0x185, 0x186}
+        arm.disconnect()
+    finally:
+        device.stop()
+
+
+def test_piper_driver_virtual_can_cpv_each_public_api_once():
+    channel = new_virtual_channel("ci_piper_cpv_all")
+    device = PiperCanSlave(channel=channel)
+    device.start()
+    try:
+        arm = _make_piper_arm(PiperFW.DEFAULT, channel)
+        arm.connect()
+        arm.set_motion_mode("cpv")
+        to = 1.0
+        mi = 0.0
+
+        arm.move_cpv_pos(1, 0.02)
+        assert arm.get_cpv_pos(1, timeout=to, min_interval=mi) is not None
+
+        arm.move_cpv_vel(2, -0.03)
+        assert arm.get_cpv_vel(2, timeout=to, min_interval=mi) is not None
+
+        assert arm.set_cpv_acc(3, 1.05, timeout=to)
+        assert arm.get_cpv_acc(3, timeout=to, min_interval=mi) is not None
+
+        assert arm.set_cpv_dcc(4, 1.06, timeout=to)
+        assert arm.get_cpv_dcc(4, timeout=to, min_interval=mi) is not None
+
+        assert arm.set_cpv_cv(5, 0.42, timeout=to)
+        assert arm.get_cpv_cv(5, timeout=to, min_interval=mi) is not None
+
+        assert arm.set_cpv_pp(6, 1.15, timeout=to)
+        assert arm.get_cpv_pp(6, timeout=to, min_interval=mi) is not None
+
+        assert arm.set_cpv_kp(1, 0.88, timeout=to)
+        assert arm.get_cpv_kp(1, timeout=to, min_interval=mi) is not None
+
+        assert arm.set_cpv_ki(2, 0.21, timeout=to)
+        assert arm.get_cpv_ki(2, timeout=to, min_interval=mi) is not None
+
+        arm.disconnect()
+    finally:
+        device.stop()

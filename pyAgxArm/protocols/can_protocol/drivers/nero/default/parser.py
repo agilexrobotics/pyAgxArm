@@ -10,6 +10,9 @@ from ....msgs.core.msg_abstract import MessageAbstract
 from ...piper.default.parser import Codec as PiperCodec
 from ...piper.default.parser import Parser as PiperParser
 from ....msgs.nero.default import (
+    ArmMsgModeCtrl,
+    ArmMsgCPVSettingsAndQueries7,
+    ArmMsgFeedbackCPVResponse7,
     ArmMsgFeedbackJointStates7,
     ArmMsgJointCtrl7,
     ArmMsgJointMitCtrl7,
@@ -22,7 +25,6 @@ from ....msgs.nero.default import (
     ArmMsgFeedbackHighSpd7,
     ArmMsgFeedbackLowSpd7,
     ArmMsgFeedbackStatus,
-    ArmMsgModeCtrl,
     ArmMsgFeedbackLeaderJointStates1,
     ArmMsgFeedbackLeaderJointStates2,
     ArmMsgFeedbackLeaderJointStates3,
@@ -49,6 +51,7 @@ class NeroDefaultDriverAPIOptions(DriverAPIOptions):
         C = "c"
         MIT = "mit"
         JS = "js"
+        CPV = "cpv"
 
 class NeroDefaultDriverAPIProtoAdapter(DriverAPIProtoAdapter):
 
@@ -59,6 +62,7 @@ class NeroDefaultDriverAPIProtoAdapter(DriverAPIProtoAdapter):
         NeroDefaultDriverAPIOptions.MOTION_MODE.C: ArmMsgModeCtrl.Enums.MotionMode.C,
         NeroDefaultDriverAPIOptions.MOTION_MODE.MIT: ArmMsgModeCtrl.Enums.MotionMode.MIT,
         NeroDefaultDriverAPIOptions.MOTION_MODE.JS: ArmMsgModeCtrl.Enums.MotionMode.J,
+        NeroDefaultDriverAPIOptions.MOTION_MODE.CPV: ArmMsgModeCtrl.Enums.MotionMode.CPV,
     }
 
     _MIT_CODE = {
@@ -113,7 +117,12 @@ class Parser(PiperParser):
         **PiperParser._MSG_JointMitCtrlByIndex,
         7: ArmMsgJointMitCtrl7,
     }
-    
+
+    _MSG_CPVSettingsAndQueriesByIndex: Dict[int, Type[AttributeBase]] = {
+        **PiperParser._MSG_CPVSettingsAndQueriesByIndex,
+        7: ArmMsgCPVSettingsAndQueries7,
+    }
+
     if TYPE_CHECKING:
         arm_status: Optional[MessageAbstract[ArmMsgFeedbackStatus]]
         joint_7: Optional[MessageAbstract[ArmMsgFeedbackJointStates7]]
@@ -127,6 +136,8 @@ class Parser(PiperParser):
         leader_joint_5: Optional[MessageAbstract[ArmMsgFeedbackLeaderJointStates5]]
         leader_joint_6: Optional[MessageAbstract[ArmMsgFeedbackLeaderJointStates6]]
         leader_joint_7: Optional[MessageAbstract[ArmMsgFeedbackLeaderJointStates7]]
+
+        cpv_response_7: Optional[MessageAbstract[ArmMsgFeedbackCPVResponse7]]
 
     def __init__(self, fps_manager: FPSManager, codec: Optional[Codec] = None):
         # Reuse Piper Parser init; only replace codec with Nero version.
@@ -147,6 +158,11 @@ class Parser(PiperParser):
         # Nero 增量：第 7 轴相关 CAN-ID
         rx.update(
             {
+                0x187: (
+                    "cpv_response_7",
+                    ArmMsgFeedbackCPVResponse7,
+                    self._codec.decode_cpv_response,
+                ),
                 0x251: (
                     "motor_state_1",
                     ArmMsgFeedbackHighSpd1,
@@ -264,6 +280,10 @@ class Parser(PiperParser):
                 ArmMsgJointMitCtrl7.type_: (
                     0x160,
                     self._codec.pack_joint_mit_ctrl
+                ),
+                ArmMsgCPVSettingsAndQueries7.type_: (
+                    0x187,
+                    self._codec.encode_cpv_settings_and_queries,
                 ),
             }
         )

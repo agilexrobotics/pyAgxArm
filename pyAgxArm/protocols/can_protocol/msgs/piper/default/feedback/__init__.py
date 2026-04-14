@@ -15,6 +15,15 @@ from .arm_feedback_low_spd import ArmMsgFeedbackLowSpd, ArmMsgFeedbackAllLowSpd,
 from .arm_feedback_status import ArmMsgFeedbackStatus, ArmMsgFeedbackStatusEnum
 from .arm_feedback_set_instruction_response import ArmMsgFeedbackRespSetInstruction
 from .arm_feedback_firmware import ArmMsgFeedbackFirmware
+from .arm_feedback_cpv_response import (
+    ArmMsgFeedbackCPVResponse,
+    ArmMsgFeedbackCPVResponse1,
+    ArmMsgFeedbackCPVResponse2,
+    ArmMsgFeedbackCPVResponse3,
+    ArmMsgFeedbackCPVResponse4,
+    ArmMsgFeedbackCPVResponse5,
+    ArmMsgFeedbackCPVResponse6,
+)
 
 __all__ = [
     # 反馈
@@ -52,4 +61,11 @@ __all__ = [
     'ArmMsgFeedbackLowSpd6',
     'ArmMsgFeedbackRespSetInstruction',
     'ArmMsgFeedbackFirmware',
+    'ArmMsgFeedbackCPVResponse',
+    'ArmMsgFeedbackCPVResponse1',
+    'ArmMsgFeedbackCPVResponse2',
+    'ArmMsgFeedbackCPVResponse3',
+    'ArmMsgFeedbackCPVResponse4',
+    'ArmMsgFeedbackCPVResponse5',
+    'ArmMsgFeedbackCPVResponse6',
 ]

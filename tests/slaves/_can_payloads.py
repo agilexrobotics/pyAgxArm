@@ -169,3 +169,15 @@ def pack_gripper_teaching_pendant_param_47e(
 
 def pack_joint7_only_feedback(j_rad: float = 0.0) -> bytes:
     return _from_hex(_HEX_2A9_JOINT7)
+
+
+def pack_cpv_ack(type_str: str, value_i32: int) -> bytes:
+    from pyAgxArm.utiles.numeric_codec import NumericCodec as nc
+
+    if len(type_str) != 2:
+        raise ValueError("type_str must be length 2")
+    body = (
+        [0x61, ord(type_str[0]), ord(type_str[1])]
+        + nc.ConvertToList_32bit(value_i32, signed=True)
+    )
+    return bytes(body).ljust(8, b"\x00")

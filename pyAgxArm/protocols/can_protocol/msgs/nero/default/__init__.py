@@ -80,4 +80,6 @@ __all__ = [
     'ArmMsgJointMitCtrl6',
     'ArmMsgJointMitCtrl7',
     'ArmMsgReqFirmware',
+    'ArmMsgCPVSettingsAndQueries7',
+    'ArmMsgFeedbackCPVResponse7',
 ]

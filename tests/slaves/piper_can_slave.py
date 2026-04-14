@@ -38,6 +38,8 @@ class PiperCanSlave:
         self._mode_feedback = 0x01
         self._proactive_burst_sent = False
         self._proactive_refresh = False
+        self._cpv_reply_enabled = True
+        self._cpv_store: dict = {}
 
     def start(self):
         self._th.start()
@@ -260,6 +262,30 @@ class PiperCanSlave:
             )
         return out
 
+    def _cpv_replies(self, aid: int, data: bytes) -> List[can.Message]:
+        if not self._cpv_reply_enabled or not (0x181 <= aid <= 0x186):
+            return []
+        d = data.ljust(8, b"\x00")
+        mode_byte = d[0]
+        if mode_byte not in (0x72, 0x77):
+            return []
+        type_str = chr(d[1]) + chr(d[2])
+        raw = int.from_bytes(bytes(d[3:7]), "big", signed=True)
+        ji = aid - 0x180
+        if mode_byte == 0x77:
+            self._cpv_store[(ji, type_str)] = raw
+            out_raw = raw
+        else:
+            out_raw = self._cpv_store.get((ji, type_str), 0)
+        payload = pl.pack_cpv_ack(type_str, out_raw)
+        return [
+            can.Message(
+                is_extended_id=False,
+                arbitration_id=aid,
+                data=payload,
+            )
+        ]
+
     def _firmware_replies(self, aid: int) -> List[can.Message]:
         if aid != 0x4AF:
             return []
@@ -307,6 +333,8 @@ class PiperCanSlave:
                     self._send_and_record(m)
 
             for m in self._set_instruction_replies(aid, payload):
+                self._send_and_record(m)
+            for m in self._cpv_replies(aid, payload):
                 self._send_and_record(m)
             for m in self._firmware_replies(aid):
                 self._send_and_record(m)

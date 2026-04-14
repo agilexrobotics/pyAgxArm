@@ -30,6 +30,7 @@ from .arm_feedback_high_spd import ArmMsgFeedbackHighSpd, ArmMsgFeedbackAllHighS
 from .arm_feedback_joint_states import ArmMsgFeedbackJointStates, ArmMsgFeedbackJointStates7
 from .arm_feedback_low_spd import ArmMsgFeedbackLowSpd, ArmMsgFeedbackAllLowSpd, ArmMsgFeedbackLowSpd7
 from .arm_feedback_status import ArmMsgFeedbackStatus, ArmMsgFeedbackStatusEnum
+from .arm_feedback_cpv_response import ArmMsgFeedbackCPVResponse7
 from .arm_feedback_leader_joint_states import (
     ArmMsgFeedbackLeaderJointStates,
     ArmMsgFeedbackLeaderJointStates1,
@@ -88,4 +89,5 @@ __all__ = [
     'ArmMsgFeedbackLeaderJointStates5',
     'ArmMsgFeedbackLeaderJointStates6',
     'ArmMsgFeedbackLeaderJointStates7',
+    'ArmMsgFeedbackCPVResponse7',
 ]

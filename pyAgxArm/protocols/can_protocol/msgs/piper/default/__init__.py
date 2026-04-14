@@ -39,6 +39,13 @@ __all__ = [
     'ArmMsgFeedbackLowSpd6',
     'ArmMsgFeedbackRespSetInstruction',
     'ArmMsgFeedbackFirmware',
+    'ArmMsgFeedbackCPVResponse',
+    'ArmMsgFeedbackCPVResponse1',
+    'ArmMsgFeedbackCPVResponse2',
+    'ArmMsgFeedbackCPVResponse3',
+    'ArmMsgFeedbackCPVResponse4',
+    'ArmMsgFeedbackCPVResponse5',
+    'ArmMsgFeedbackCPVResponse6',
     # 发送
     'ArmMsgMotionCtrl',
     'ArmMsgModeCtrl',
@@ -67,5 +74,12 @@ __all__ = [
     'ArmMsgJointMitCtrl4',
     'ArmMsgJointMitCtrl5',
     'ArmMsgJointMitCtrl6',
-    'ArmMsgReqFirmware'
+    'ArmMsgReqFirmware',
+    'ArmMsgCPVSettingsAndQueries',
+    'ArmMsgCPVSettingsAndQueries1',
+    'ArmMsgCPVSettingsAndQueries2',
+    'ArmMsgCPVSettingsAndQueries3',
+    'ArmMsgCPVSettingsAndQueries4',
+    'ArmMsgCPVSettingsAndQueries5',
+    'ArmMsgCPVSettingsAndQueries6',
 ]

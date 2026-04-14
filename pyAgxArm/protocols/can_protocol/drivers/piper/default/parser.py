@@ -1,7 +1,6 @@
-from typing import TYPE_CHECKING, Callable, Optional, Union, List, Dict, Tuple, Type
+from typing import TYPE_CHECKING, Callable, Optional, List, Dict, Tuple, Type
 
-from typing_extensions import Protocol
-from typing_extensions import Final
+from typing_extensions import Final, Literal
 from ......utiles.fps import FPSManager
 from ......utiles.numeric_codec import (
     NumericCodec as nc,
@@ -33,6 +32,7 @@ class PiperDefaultDriverAPIOptions(DriverAPIOptions):
         C: Final = "c"
         MIT: Final = "mit"
         JS: Final = "js"
+        CPV: Final = "cpv"
 
 class PiperDefaultDriverAPIProtoAdapter(DriverAPIProtoAdapter):
     _INSTALL_POS_CODE = {
@@ -48,6 +48,7 @@ class PiperDefaultDriverAPIProtoAdapter(DriverAPIProtoAdapter):
         PiperDefaultDriverAPIOptions.MOTION_MODE.C: ArmMsgModeCtrl.Enums.MotionMode.C,
         PiperDefaultDriverAPIOptions.MOTION_MODE.MIT: ArmMsgModeCtrl.Enums.MotionMode.MIT,
         PiperDefaultDriverAPIOptions.MOTION_MODE.JS: ArmMsgModeCtrl.Enums.MotionMode.J,
+        PiperDefaultDriverAPIOptions.MOTION_MODE.CPV: ArmMsgModeCtrl.Enums.MotionMode.CPV,
     }
 
     _MIT_CODE = {
@@ -77,48 +78,6 @@ class PiperDefaultDriverAPIProtoAdapter(DriverAPIProtoAdapter):
     def payload(cls, value: str) -> int:
         return cls._PAYLOAD_CODE[value]
 
-class _HighSpdLike(Protocol):
-    velocity: float
-    current: float
-    position: float
-
-
-class _LowSpdLike(Protocol):
-    vol: float
-    foc_temp: float
-    motor_temp: float
-    foc_status_code: int
-    bus_current: float
-
-
-HighSpdMsg = Union[
-    ArmMsgFeedbackHighSpd1,
-    ArmMsgFeedbackHighSpd2,
-    ArmMsgFeedbackHighSpd3,
-    ArmMsgFeedbackHighSpd4,
-    ArmMsgFeedbackHighSpd5,
-    ArmMsgFeedbackHighSpd6,
-]
-
-LowSpdMsg = Union[
-    ArmMsgFeedbackLowSpd1,
-    ArmMsgFeedbackLowSpd2,
-    ArmMsgFeedbackLowSpd3,
-    ArmMsgFeedbackLowSpd4,
-    ArmMsgFeedbackLowSpd5,
-    ArmMsgFeedbackLowSpd6,
-]
-
-JointMitCtrlMsg = Union[
-    ArmMsgJointMitCtrl1,
-    ArmMsgJointMitCtrl2,
-    ArmMsgJointMitCtrl3,
-    ArmMsgJointMitCtrl4,
-    ArmMsgJointMitCtrl5,
-    ArmMsgJointMitCtrl6,
-]
-
-
 class Codec:
     """
     Piper 编解码器。
@@ -129,7 +88,7 @@ class Codec:
     # -------------------------
     # Common codec helpers
     # -------------------------
-    def decode_high_spd(self, motor_state: _HighSpdLike, can_data: bytearray) -> None:
+    def decode_high_spd(self, motor_state: ArmMsgFeedbackHighSpd, can_data: bytearray) -> None:
         """高速反馈通用解码：写入 velocity/current/position"""
         motor_state.velocity = (
             nc.ConvertToNegative_16bit(nc.ConvertBytesToInt(can_data, 0, 2)) * 1e-3
@@ -141,7 +100,7 @@ class Codec:
             nc.ConvertToNegative_32bit(nc.ConvertBytesToInt(can_data, 4, 8)) * 1e-3
         )
 
-    def decode_low_spd(self, driver_state: _LowSpdLike, can_data: bytearray) -> None:
+    def decode_low_spd(self, driver_state: ArmMsgFeedbackLowSpd, can_data: bytearray) -> None:
         """低速反馈通用解码：写入 vol/foc_temp/motor_temp/foc_status_code/bus_current"""
         driver_state.vol = (
             nc.ConvertToNegative_16bit(nc.ConvertBytesToInt(can_data, 0, 2), False)
@@ -161,7 +120,7 @@ class Codec:
             * 1e-3
         )
 
-    def pack_joint_mit_ctrl(self, joint_mit_ctrl: JointMitCtrlMsg) -> bytearray:
+    def pack_joint_mit_ctrl(self, joint_mit_ctrl: ArmMsgJointMitCtrl) -> bytearray:
         """
         MIT 控制通用打包（关节 1~6 结构一致）：返回 data（bytearray）。
         joint_mit_ctrl 需具备 p_des/v_des/kp/kd/t_ff/crc 字段。
@@ -392,6 +351,21 @@ class Codec:
             * DEG2RAD
         )
 
+    def decode_cpv_response(self, m: ArmMsgFeedbackCPVResponse, d: bytearray) -> None:
+        mode = chr(nc.ConvertToNegative_8bit(nc.ConvertBytesToInt(d, 0, 1), False))
+        if mode != "a":
+            return
+        type_code = (
+            chr(nc.ConvertToNegative_8bit(nc.ConvertBytesToInt(d, 1, 2), False))
+            + chr(nc.ConvertToNegative_8bit(nc.ConvertBytesToInt(d, 2, 3), False))
+        )
+        value = nc.ConvertToNegative_32bit(nc.ConvertBytesToInt(d, 3, 7))
+
+        m.mode = mode
+        m.type = type_code
+        m.value = value
+        m.type_value[m.type] = m.value
+
     # -------------------------
     # TX encoders (msg -> data)
     # -------------------------
@@ -550,6 +524,19 @@ class Codec:
         # 历史行为：固定请求帧
         return [0x01]
 
+    def encode_cpv_settings_and_queries(
+        self, msg: ArmMsgCPVSettingsAndQueries
+    ) -> List[int]:
+        type_code = msg.type if isinstance(msg.type, str) else "".join(msg.type)
+        if len(type_code) != 2:
+            raise ValueError("CPV type code should contain 2 chars")
+        return (
+            nc.ConvertToList_8bit(ord(msg.mode), False)
+            + nc.ConvertToList_8bit(ord(type_code[0]), False)
+            + nc.ConvertToList_8bit(ord(type_code[1]), False)
+            + nc.ConvertToList_32bit(msg.value)
+        )
+
 
 class Parser(TableDriven, ProtocolParserInterface):
     # Message classes used by driver-side message construction helpers.
@@ -575,6 +562,15 @@ class Parser(TableDriven, ProtocolParserInterface):
         4: ArmMsgJointMitCtrl4,
         5: ArmMsgJointMitCtrl5,
         6: ArmMsgJointMitCtrl6,
+    }
+
+    _MSG_CPVSettingsAndQueriesByIndex: Dict[int, Type[AttributeBase]] = {
+        1: ArmMsgCPVSettingsAndQueries1,
+        2: ArmMsgCPVSettingsAndQueries2,
+        3: ArmMsgCPVSettingsAndQueries3,
+        4: ArmMsgCPVSettingsAndQueries4,
+        5: ArmMsgCPVSettingsAndQueries5,
+        6: ArmMsgCPVSettingsAndQueries6,
     }
 
     if TYPE_CHECKING:
@@ -622,6 +618,13 @@ class Parser(TableDriven, ProtocolParserInterface):
         leader_joint_12: Optional[MessageAbstract[ArmMsgJointCtrl12]]
         leader_joint_34: Optional[MessageAbstract[ArmMsgJointCtrl34]]
         leader_joint_56: Optional[MessageAbstract[ArmMsgJointCtrl56]]
+
+        cpv_response_1: Optional[MessageAbstract[ArmMsgFeedbackCPVResponse1]]
+        cpv_response_2: Optional[MessageAbstract[ArmMsgFeedbackCPVResponse2]]
+        cpv_response_3: Optional[MessageAbstract[ArmMsgFeedbackCPVResponse3]]
+        cpv_response_4: Optional[MessageAbstract[ArmMsgFeedbackCPVResponse4]]
+        cpv_response_5: Optional[MessageAbstract[ArmMsgFeedbackCPVResponse5]]
+        cpv_response_6: Optional[MessageAbstract[ArmMsgFeedbackCPVResponse6]]
 
     def __init__(self, fps_manager: FPSManager, codec: Optional[Codec] = None):
         super().__init__(fps_manager=fps_manager)
@@ -695,6 +698,22 @@ class Parser(TableDriven, ProtocolParserInterface):
             raise ValueError(f"Unsupported joint_index for MIT control: {joint_index}")
         return cls(p_des=p_des, v_des=v_des, kp=kp, kd=kd, t_ff=t_ff)
 
+    def _make_cpv_settings_and_queries_msg(
+        self,
+        *,
+        joint_index: int,
+        mode: Literal["w", "r"],
+        type_: Literal["po", "sp", "ac", "dc", "vv", "pp", "kp", "ki"],
+        value: int,
+    ) -> AttributeBase:
+        """Build one CPV setting/query message for a specific joint index."""
+        cls = self._MSG_CPVSettingsAndQueriesByIndex.get(joint_index)
+        if cls is None:
+            raise ValueError(
+                f"Unsupported joint_index for CPV setting/query: {joint_index}"
+            )
+        return cls(mode=mode, type=type_, value=value)
+
     def _build_rx_map(
         self,
     ) -> Dict[int, Tuple[str, Type, Callable[[object, bytearray], None]]]:
@@ -714,6 +733,36 @@ class Parser(TableDriven, ProtocolParserInterface):
                 "leader_joint_56",
                 ArmMsgJointCtrl56,
                 self._codec.decode_157_joint_ctrl_56
+            ),
+            0x181: (
+                "cpv_response_1",
+                ArmMsgFeedbackCPVResponse1,
+                self._codec.decode_cpv_response,
+            ),
+            0x182: (
+                "cpv_response_2",
+                ArmMsgFeedbackCPVResponse2,
+                self._codec.decode_cpv_response,
+            ),
+            0x183: (
+                "cpv_response_3",
+                ArmMsgFeedbackCPVResponse3,
+                self._codec.decode_cpv_response,
+            ),
+            0x184: (
+                "cpv_response_4",
+                ArmMsgFeedbackCPVResponse4,
+                self._codec.decode_cpv_response,
+            ),
+            0x185: (
+                "cpv_response_5",
+                ArmMsgFeedbackCPVResponse5,
+                self._codec.decode_cpv_response,
+            ),
+            0x186: (
+                "cpv_response_6",
+                ArmMsgFeedbackCPVResponse6,
+                self._codec.decode_cpv_response,
             ),
             0x251: (
                 "motor_state_1",
@@ -878,6 +927,30 @@ class Parser(TableDriven, ProtocolParserInterface):
             ArmMsgJointMitCtrl4.type_: (0x15D, self._codec.pack_joint_mit_ctrl),
             ArmMsgJointMitCtrl5.type_: (0x15E, self._codec.pack_joint_mit_ctrl),
             ArmMsgJointMitCtrl6.type_: (0x15F, self._codec.pack_joint_mit_ctrl),
+            ArmMsgCPVSettingsAndQueries1.type_: (
+                0x181,
+                self._codec.encode_cpv_settings_and_queries,
+            ),
+            ArmMsgCPVSettingsAndQueries2.type_: (
+                0x182,
+                self._codec.encode_cpv_settings_and_queries,
+            ),
+            ArmMsgCPVSettingsAndQueries3.type_: (
+                0x183,
+                self._codec.encode_cpv_settings_and_queries,
+            ),
+            ArmMsgCPVSettingsAndQueries4.type_: (
+                0x184,
+                self._codec.encode_cpv_settings_and_queries,
+            ),
+            ArmMsgCPVSettingsAndQueries5.type_: (
+                0x185,
+                self._codec.encode_cpv_settings_and_queries,
+            ),
+            ArmMsgCPVSettingsAndQueries6.type_: (
+                0x186,
+                self._codec.encode_cpv_settings_and_queries,
+            ),
             ArmMsgLeaderArmMoveToHome.type_: (
                 0x191,
                 self._codec.encode_191_leader_arm_move_to_home

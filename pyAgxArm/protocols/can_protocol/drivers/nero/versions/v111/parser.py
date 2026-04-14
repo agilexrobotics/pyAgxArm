@@ -11,8 +11,8 @@ from ...default.parser import (
     NeroDefaultDriverAPIProtoAdapter,
     NeroDefaultDriverAPIOptions,
 )
-from ....piper.default.parser import (
-    JointMitCtrlMsg,
+from .....msgs.piper.default import (
+    ArmMsgJointMitCtrl,
 )
 
 
@@ -26,7 +26,7 @@ class NeroV111DriverAPIProtoAdapter(NeroDefaultDriverAPIProtoAdapter):
 class Codec(DefaultCodec):
     """v111+ codec: 12-bit t_ff, no CRC."""
 
-    def pack_joint_mit_ctrl(self, joint_mit_ctrl: JointMitCtrlMsg) -> bytearray:
+    def pack_joint_mit_ctrl(self, joint_mit_ctrl: ArmMsgJointMitCtrl) -> bytearray:
         """v188+: 12-bit t_ff, no CRC.
 
         Byte layout (8 bytes total):

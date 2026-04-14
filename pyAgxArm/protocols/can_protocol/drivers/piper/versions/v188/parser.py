@@ -8,7 +8,7 @@ from .....msgs.piper.versions import (
 from ...default.parser import (
     Codec as DefaultCodec,
     Parser as DefaultParser,
-    JointMitCtrlMsg,
+    ArmMsgJointMitCtrl,
     PiperDefaultDriverAPIProtoAdapter,
     PiperDefaultDriverAPIOptions,
 )
@@ -24,7 +24,7 @@ class PiperV188DriverAPIProtoAdapter(PiperDefaultDriverAPIProtoAdapter):
 class Codec(DefaultCodec):
     """v188+ codec: 12-bit t_ff, no CRC."""
 
-    def pack_joint_mit_ctrl(self, joint_mit_ctrl: JointMitCtrlMsg) -> bytearray:
+    def pack_joint_mit_ctrl(self, joint_mit_ctrl: ArmMsgJointMitCtrl) -> bytearray:
         """v188+: 12-bit t_ff, no CRC.
 
         Byte layout (8 bytes total):

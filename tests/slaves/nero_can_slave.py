@@ -38,6 +38,8 @@ class NeroCanSlave:
         self._leader_rad = [0.01 * float(i + 1) for i in range(self._joint_count)]
         self._proactive_burst_sent = False
         self._proactive_refresh = False
+        self._cpv_reply_enabled = True
+        self._cpv_store: dict = {}
 
     def start(self):
         self._th.start()
@@ -196,6 +198,30 @@ class NeroCanSlave:
         with self._lock:
             self._device_frames.append(msg)
 
+    def _cpv_replies(self, aid: int, data: bytes) -> List[can.Message]:
+        if not self._cpv_reply_enabled or not (0x181 <= aid <= 0x187):
+            return []
+        d = data.ljust(8, b"\x00")
+        mode_byte = d[0]
+        if mode_byte not in (0x72, 0x77):
+            return []
+        type_str = chr(d[1]) + chr(d[2])
+        raw = int.from_bytes(bytes(d[3:7]), "big", signed=True)
+        ji = aid - 0x180
+        if mode_byte == 0x77:
+            self._cpv_store[(ji, type_str)] = raw
+            out_raw = raw
+        else:
+            out_raw = self._cpv_store.get((ji, type_str), 0)
+        payload = pl.pack_cpv_ack(type_str, out_raw)
+        return [
+            can.Message(
+                is_extended_id=False,
+                arbitration_id=aid,
+                data=payload,
+            )
+        ]
+
     def _firmware_replies(self, aid: int) -> List[can.Message]:
         if aid != 0x4AF:
             return []
@@ -227,5 +253,7 @@ class NeroCanSlave:
             if need_proactive:
                 for m in self._standard_feedback_burst():
                     self._send_and_record(m)
+            for m in self._cpv_replies(frame.arbitration_id, payload):
+                self._send_and_record(m)
             for m in self._firmware_replies(frame.arbitration_id):
                 self._send_and_record(m)

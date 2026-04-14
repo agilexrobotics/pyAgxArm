@@ -186,6 +186,16 @@ while True:
     #     print(j)
     #     print()
 
+    # CPV
+    # print([robot.get_cpv_pos(i) for i in range(1, robot.joint_nums + 1)])
+    # print([robot.get_cpv_vel(i) for i in range(1, robot.joint_nums + 1)])
+    # print([robot.get_cpv_acc(i) for i in range(1, robot.joint_nums + 1)])
+    # print([robot.get_cpv_dcc(i) for i in range(1, robot.joint_nums + 1)])
+    # print([robot.get_cpv_cv(i) for i in range(1, robot.joint_nums + 1)])
+    # print([robot.get_cpv_pp(i) for i in range(1, robot.joint_nums + 1)])
+    # print([robot.get_cpv_kp(i) for i in range(1, robot.joint_nums + 1)])
+    # print([robot.get_cpv_ki(i) for i in range(1, robot.joint_nums + 1)])
+
     # Revo2
     # print(end_effector.get_hand_status())
     # print(end_effector.get_finger_pos())
@@ -323,3 +333,43 @@ while True:
 # print(pose)
 # robot.move_p(pose)
 # wait_motion_done(robot, timeout=5.0)
+
+
+# -------------------------- CPV --------------------------
+
+# robot.move_cpv_pos(1, 0.0)
+# robot.move_cpv_vel(1, 0.0)
+
+# ac = robot.get_cpv_acc(1)
+# print("ac:", ac)
+# print(robot.set_cpv_acc(1, ac))
+
+# dc = robot.get_cpv_dcc(1)
+# print("dc:", dc)
+# print(robot.set_cpv_dcc(1, dc))
+
+# cv = robot.get_cpv_cv(1)
+# print("cv:", cv)
+# print(robot.set_cpv_cv(1, cv))
+
+# pp = robot.get_cpv_pp(1)
+# print("pp:", pp)
+# print(robot.set_cpv_pp(1, pp))
+
+# kp = robot.get_cpv_kp(1)
+# print("kp:", kp)
+# print(robot.set_cpv_kp(1, kp))
+
+# ki = robot.get_cpv_ki(1)
+# print("ki:", ki)
+# print(robot.set_cpv_ki(1, ki))
+
+# for i in range(1, robot.joint_nums + 1):
+#     robot.set_cpv_cv(i, 1.5)
+#     robot.move_cpv_pos(i, 0)
+# wait_motion_done(robot, timeout=1)
+
+# for i in range(1, robot.joint_nums + 1):
+#     robot.set_cpv_cv(i, 3.0)
+#     robot.move_cpv_pos(i, -0.2)
+# wait_motion_done(robot, timeout=1)
