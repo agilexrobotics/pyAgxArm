@@ -14,6 +14,7 @@ _HEX_1C2_FINGER_SPD = "0000000000000000"
 _HEX_1C3_FINGER_CURRENT = "0000000000000000"
 _HEX_473_MOTOR_LIMIT_SPD = "0100000000000000"
 _HEX_47B_CRASH_RATING = "0000000000000000"
+_HEX_488_JOINT_ASSIST = "0000000000000000"
 _HEX_47C_MOTOR_MAX_ACC = "0100000000000000"
 _HEX_478_END_VEL_ACC = "03e803e803e803e8"
 _HEX_501_LEADER_J1 = "0ad7233c00000000"
@@ -102,6 +103,15 @@ def pack_feedback_473_motor_angle_limit_max_spd() -> bytes:
 
 def pack_feedback_47b_crash_protection() -> bytes:
     return _from_hex(_HEX_47B_CRASH_RATING)
+
+
+def pack_feedback_488_joint_assistance(joints=None) -> bytes:
+    if joints is None:
+        return _from_hex(_HEX_488_JOINT_ASSIST)
+    if len(joints) != 6:
+        raise ValueError("joints should contain 6 items")
+    data = [int(v) & 0xFF for v in joints] + [0, 0]
+    return bytes(data)
 
 
 def pack_feedback_47c_motor_max_acc_limit() -> bytes:

@@ -40,6 +40,7 @@ class PiperCanSlave:
         self._proactive_refresh = False
         self._cpv_reply_enabled = True
         self._cpv_store: dict = {}
+        self._joint_assistance = [0] * self._joint_count
 
     def start(self):
         self._th.start()
@@ -203,6 +204,14 @@ class PiperCanSlave:
                         data=pl.pack_feedback_47b_crash_protection(),
                     )
                 )
+            if d[0] == 0x05:
+                out.append(
+                    can.Message(
+                        is_extended_id=False,
+                        arbitration_id=0x488,
+                        data=pl.pack_feedback_488_joint_assistance(self._joint_assistance),
+                    )
+                )
             if d[2] in (0x01, 0x02):
                 out.append(
                     can.Message(
@@ -258,6 +267,22 @@ class PiperCanSlave:
                     is_extended_id=False,
                     arbitration_id=0x476,
                     data=pl.pack_set_instruction_response(0x7A, 0),
+                )
+            )
+        elif aid == 0x487:
+            self._joint_assistance = list(d[:6])
+            out.append(
+                can.Message(
+                    is_extended_id=False,
+                    arbitration_id=0x476,
+                    data=pl.pack_set_instruction_response(0x87, 0),
+                )
+            )
+            out.append(
+                can.Message(
+                    is_extended_id=False,
+                    arbitration_id=0x488,
+                    data=pl.pack_feedback_488_joint_assistance(self._joint_assistance),
                 )
             )
         return out

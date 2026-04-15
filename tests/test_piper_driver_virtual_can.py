@@ -188,6 +188,7 @@ def test_piper_proprietary_apis_l2():
         assert arm.get_joint_acc_limits(1, timeout=1.0, min_interval=0.0) is not None
         assert arm.get_flange_vel_acc_limits(timeout=1.0, min_interval=0.0) is not None
         assert arm.get_crash_protection_rating(timeout=1.0, min_interval=0.0) is not None
+        assert arm.get_joint_assistance_rating(timeout=1.0, min_interval=0.0) is not None
 
         # set_* 系列
         assert arm.calibrate_joint(1, timeout=1.0)
@@ -196,12 +197,13 @@ def test_piper_proprietary_apis_l2():
         assert arm.set_joint_acc_limits(1, timeout=1.0)
         assert arm.set_flange_vel_acc_limits(timeout=1.0)
         assert arm.set_crash_protection_rating(1, 0, timeout=1.0)
+        assert arm.set_joint_assistance_rating(1, 3, timeout=1.0)
         assert arm.set_flange_vel_acc_limits_to_default(timeout=1.0)
         assert arm.set_joint_angle_vel_acc_limits_to_default(timeout=1.0)
         assert arm.set_links_vel_acc_period_feedback(enable=True, timeout=1.0)
 
         ids = {f.arbitration_id for f in device.device_frames}
-        assert {0x473, 0x47C, 0x478, 0x47B, 0x476}.issubset(ids)
+        assert {0x473, 0x47C, 0x478, 0x47B, 0x488, 0x476}.issubset(ids)
         arm.disconnect()
     finally:
         device.stop()

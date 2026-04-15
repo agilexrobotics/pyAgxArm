@@ -31,6 +31,7 @@ from ....msgs.piper.default import (
     ArmMsgParamEnquiryAndConfig,
     ArmMsgEndVelAccParamConfig,
     ArmMsgCrashProtectionRatingConfig,
+    ArmMsgJointAssistanceRatingConfig,
     ArmMsgMotionCtrl,
     ArmMsgLeaderArmMoveToHome,
     ArmMsgLeaderFollowerModeConfig,
@@ -86,6 +87,7 @@ class Driver(ArmDriverAbstract):
     _MSG_MotorAngleLimitMaxSpdSet = ArmMsgMotorAngleLimitMaxSpdSet
     _MSG_EndVelAccParamConfig = ArmMsgEndVelAccParamConfig
     _MSG_CrashProtectionRatingConfig = ArmMsgCrashProtectionRatingConfig
+    _MSG_JointAssistanceRatingConfig = ArmMsgJointAssistanceRatingConfig
 
     def __init__(self, config: dict):
         super().__init__(config)
@@ -1728,6 +1730,62 @@ class Driver(ArmDriverAbstract):
             stamp_attr="crash_protection_rating",
         )
 
+    def get_joint_assistance_rating(
+        self, timeout: float = 1.0, min_interval: float = 1.0
+    ):
+        """Get the joint assistance rating.
+
+        Parameters
+        ----------
+        `timeout`: float, optional
+        - Timeout in seconds (see `Driver` docstring: Common conventions -> `timeout`).
+        - Default is 1.0.
+
+        `min_interval`: float, optional
+        - Minimum interval in seconds between two consecutive requests.
+        - Default is 1.0.
+
+        Returns
+        -------
+        MessageAbstract[list[int]] | None
+            The joint assistance rating of all joints.
+            If the rating is not available, return None.
+        """
+        def request() -> None:
+            self._send_msg(self._MSG_ParamEnquiryAndConfig(param_enquiry=0x05))
+
+        def is_ready() -> bool:
+            return (
+                getattr(self._parser, "joint_assistance_rating", None) is not None
+                and self._parser.joint_assistance_rating.msg.joint_1 is not None
+            )
+
+        def get_value() -> MessageAbstract[List[int]]:
+            self._parser.joint_assistance_rating.hz = self._ctx.fps.get_fps(
+                self._parser.joint_assistance_rating.msg_type
+            )
+            temp: MessageAbstract[List[int]] = copy.deepcopy(
+                self._parser.joint_assistance_rating
+            )
+            temp.msg = [
+                getattr(temp.msg, f"joint_{i}")
+                for i in range(1, self._JOINT_NUMS + 1)
+            ]
+            return temp
+
+        def clear() -> None:
+            self._parser.joint_assistance_rating.msg.clear()
+
+        return self._ctx._request_and_get(
+            request=request,
+            is_ready=is_ready,
+            get_value=get_value,
+            clear=clear,
+            timeout=timeout,
+            min_interval=min_interval,
+            stamp_attr="joint_assistance_rating",
+        )
+
     def calibrate_joint(
         self,
         joint_index: Literal[1, 2, 3, 4, 5, 6, 255] = 255,
@@ -2264,6 +2322,63 @@ class Driver(ArmDriverAbstract):
             check=check,
             timeout=timeout,
             stamp_key="set_crash_protection_rating",
+        )
+
+    def set_joint_assistance_rating(
+        self,
+        joint_index: Literal[1, 2, 3, 4, 5, 6, 255] = 255,
+        rating: Literal[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] = 0,
+        timeout: float = 1.0,
+    ):
+        """Set the joint assistance rating.
+
+        Parameters
+        ----------
+        `joint_index`: Literal[1, 2, 3, 4, 5, 6, 255]
+        - 1~6: set the assistance rating of the specified joint.
+        - 255: set the assistance rating of all joints.
+
+        `rating`: Literal[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        - 0~10: set the assistance rating of the specified joint.
+
+        `timeout`: float, optional
+        - Timeout in seconds. Default is 1.0.
+
+        Returns
+        -------
+        bool
+            True if the rating is set successfully, False otherwise.
+        """
+        self._ctx._validate_timeout(timeout)
+        if joint_index not in self._JOINT_INDEX_LIST:
+            raise ValueError(f"Joint index should be {self._JOINT_INDEX_LIST}")
+        if rating < 0 or rating > 10:
+            raise ValueError("Joint assistance rating should be between 0 and 10")
+
+        self._clear_resp_set_instruction()
+        current_rating = self.get_joint_assistance_rating()
+        if current_rating is None:
+            return False
+
+        if joint_index == 255:
+            joints = [rating] * self._JOINT_NUMS
+        else:
+            joints = current_rating.msg.copy()
+            joints[joint_index - 1] = rating
+
+        def request() -> None:
+            self._send_msg(self._MSG_JointAssistanceRatingConfig(*joints))
+
+        def check() -> bool:
+            res = self.get_joint_assistance_rating()
+            return not (res is None or res.msg != joints)
+
+        return self._ack_and_check_set(
+            request=request,
+            instruction_index=0x87,
+            check=check,
+            timeout=timeout,
+            stamp_key="set_joint_assistance_rating",
         )
 
     def set_flange_vel_acc_limits_to_default(self, timeout: float = 1.0):

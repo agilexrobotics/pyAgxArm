@@ -30,6 +30,7 @@ class ArmMsgParamEnquiryAndConfig(AttributeBase):
                 0x02,查询碰撞防护等级
                 0x03,查询当前轨迹索引
                 0x04,查询夹爪/示教器参数索引 ---- 基于V1.5-2版本后
+                0x05,查询关节助力等级 ---- 基于V1.8-1版本后
         Byte 1: uint8,参数设置,
                 设置末端 V/acc 参数为初始值: 0x01
                 设置全部关节限位、关节最大速度、关节加速度为默认值: 0x02
@@ -88,6 +89,7 @@ class ArmMsgParamEnquiryAndConfig(AttributeBase):
             END_VEL_ACC = 0x01
             CRASH_PROTECTION = 0x02
             GRIPPER_TEACHING = 0x04
+            JOINT_ASSISTANCE = 0x05
             UNKNOWN = 0xFF
         @unique
         class SetParam(IntEnumBase):
@@ -114,14 +116,14 @@ class ArmMsgParamEnquiryAndConfig(AttributeBase):
             UNKNOWN = 0xFF
     
     def __init__(self, 
-                 param_enquiry:Literal[0x00, 0x01, 0x02, 0x03, 0x04] = 0x00,
+                 param_enquiry:Literal[0x00, 0x01, 0x02, 0x03, 0x04, 0x05] = 0x00,
                  param_setting: Literal[0x00, 0x01, 0x02] = 0,
                  data_feedback_0x48x: Literal[0x00, 0x01, 0x02] = 0x00,
                  end_load_param_setting_effective: Literal[0x00, 0xAE] = 0,
                  set_end_load: Literal[0x00, 0x01, 0x02, 0x03] = 0x03
                  ):
-        if param_enquiry not in [0x00, 0x01, 0x02, 0x03, 0x04]:
-            raise ValueError(f"'param_enquiry' Value {param_enquiry} out of range [0x00, 0x01, 0x02, 0x03, 0x04]")
+        if param_enquiry not in [0x00, 0x01, 0x02, 0x03, 0x04, 0x05]:
+            raise ValueError(f"'param_enquiry' Value {param_enquiry} out of range [0x00, 0x01, 0x02, 0x03, 0x04, 0x05]")
         if param_setting not in [0x00, 0x01, 0x02]:
             raise ValueError(f"'param_setting' Value {param_setting} out of range [0x00, 0x01, 0x02]")
         if data_feedback_0x48x not in [0x00, 0x01, 0x02]:

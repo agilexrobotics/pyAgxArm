@@ -294,6 +294,16 @@ class Codec:
         if hasattr(m, "joint_7"):
             m.joint_7 = nc.ConvertToNegative_8bit(nc.ConvertBytesToInt(d, 6, 7), False)
 
+    def decode_488_joint_assistance_rating(
+        self, m: ArmMsgFeedbackJointAssistanceRating, d: bytearray
+    ) -> None:
+        m.joint_1 = nc.ConvertToNegative_8bit(nc.ConvertBytesToInt(d, 0, 1), False)
+        m.joint_2 = nc.ConvertToNegative_8bit(nc.ConvertBytesToInt(d, 1, 2), False)
+        m.joint_3 = nc.ConvertToNegative_8bit(nc.ConvertBytesToInt(d, 2, 3), False)
+        m.joint_4 = nc.ConvertToNegative_8bit(nc.ConvertBytesToInt(d, 3, 4), False)
+        m.joint_5 = nc.ConvertToNegative_8bit(nc.ConvertBytesToInt(d, 4, 5), False)
+        m.joint_6 = nc.ConvertToNegative_8bit(nc.ConvertBytesToInt(d, 5, 6), False)
+
     def decode_47C_motor_max_acc_limit(
         self, m: ArmMsgFeedbackAllCurrentMotorMaxAccLimit, d: bytearray
     ) -> None:
@@ -520,6 +530,19 @@ class Codec:
             data += [0] * (8 - len(data))
         return data[:8]
 
+    def encode_487_joint_assistance_rating_config(
+        self, msg: ArmMsgJointAssistanceRatingConfig
+    ) -> List[int]:
+        return (
+            nc.ConvertToList_8bit(msg.joint_1, False)
+            + nc.ConvertToList_8bit(msg.joint_2, False)
+            + nc.ConvertToList_8bit(msg.joint_3, False)
+            + nc.ConvertToList_8bit(msg.joint_4, False)
+            + nc.ConvertToList_8bit(msg.joint_5, False)
+            + nc.ConvertToList_8bit(msg.joint_6, False)
+            + [0] * 2
+        )
+
     def encode_4AF_req_firmware(self, _msg: ArmMsgReqFirmware) -> List[int]:
         # 历史行为：固定请求帧
         return [0x01]
@@ -608,6 +631,9 @@ class Parser(TableDriven, ProtocolParserInterface):
         ]
         crash_protection_rating: Optional[
             MessageAbstract[ArmMsgFeedbackCrashProtectionRating]
+        ]
+        joint_assistance_rating: Optional[
+            MessageAbstract[ArmMsgFeedbackJointAssistanceRating]
         ]
         motor_max_acc_limit: Optional[
             MessageAbstract[ArmMsgFeedbackAllCurrentMotorMaxAccLimit]
@@ -884,6 +910,11 @@ class Parser(TableDriven, ProtocolParserInterface):
                 ArmMsgFeedbackAllCurrentMotorMaxAccLimit,
                 self._codec.decode_47C_motor_max_acc_limit
             ),
+            0x488: (
+                "joint_assistance_rating",
+                ArmMsgFeedbackJointAssistanceRating,
+                self._codec.decode_488_joint_assistance_rating
+            ),
             0x4AF: (
                 "firmware_info",
                 ArmMsgFeedbackFirmware,
@@ -986,6 +1017,10 @@ class Parser(TableDriven, ProtocolParserInterface):
             ArmMsgCrashProtectionRatingConfig.type_: (
                 0x47A,
                 self._codec.encode_47A_crash_protection_rating_config
+            ),
+            ArmMsgJointAssistanceRatingConfig.type_: (
+                0x487,
+                self._codec.encode_487_joint_assistance_rating_config
             ),
             ArmMsgReqFirmware.type_: (
                 0x4AF,

@@ -307,6 +307,11 @@ while True:
 # print(robot.get_crash_protection_rating())
 
 
+# print(robot.get_joint_assistance_rating())
+# print(robot.set_joint_assistance_rating(joint_index=1, rating=1))
+# print(robot.get_joint_assistance_rating())
+
+
 # print(end_effector.get_gripper_teaching_pendant_param())
 # print(end_effector.set_gripper_teaching_pendant_param(teaching_range_per=100, max_range_config=0.07, teaching_friction=1))
 # print(end_effector.get_gripper_teaching_pendant_param())

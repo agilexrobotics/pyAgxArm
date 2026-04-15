@@ -18,6 +18,7 @@ from .arm_motor_enable_disable import ArmMsgMotorEnableDisableConfig
 from .arm_param_enquiry_and_config import ArmMsgParamEnquiryAndConfig
 from .arm_search_motor_max_angle_spd_acc_limit import ArmMsgSearchMotorMaxAngleSpdAccLimit
 from .arm_req_firmware import ArmMsgReqFirmware
+from .arm_joint_assistance_rating_config import ArmMsgJointAssistanceRatingConfig
 from .arm_cpv_settings_and_queries import (
     ArmMsgCPVSettingsAndQueries,
     ArmMsgCPVSettingsAndQueries1,
@@ -57,6 +58,7 @@ __all__ = [
     'ArmMsgJointMitCtrl4',
     'ArmMsgJointMitCtrl5',
     'ArmMsgJointMitCtrl6',
+    'ArmMsgJointAssistanceRatingConfig',
     'ArmMsgReqFirmware',
     'ArmMsgCPVSettingsAndQueries',
     'ArmMsgCPVSettingsAndQueries1',
