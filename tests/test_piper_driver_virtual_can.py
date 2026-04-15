@@ -191,6 +191,7 @@ def test_piper_proprietary_apis_l2():
 
         # set_* 系列
         assert arm.calibrate_joint(1, timeout=1.0)
+        assert arm.clear_joint_error(1, timeout=1.0)
         assert arm.set_joint_angle_vel_limits(1, timeout=1.0)
         assert arm.set_joint_acc_limits(1, timeout=1.0)
         assert arm.set_flange_vel_acc_limits(timeout=1.0)

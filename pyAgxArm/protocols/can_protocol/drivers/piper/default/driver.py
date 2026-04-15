@@ -1740,8 +1740,8 @@ class Driver(ArmDriverAbstract):
         Parameters
         ----------
         `joint_index`: Literal[1, 2, 3, 4, 5, 6, 255]
-        - 1~6: calibrate the specified joint.
-        - 255: calibrate all joints.
+        - 1~6: calibrate the specified joint without offset.
+        - 255: calibrate all joints with offset. See the official tutorial for pre-calibration joint poses.
 
         `timeout`: float, optional
         - Timeout in seconds. Default is 1.0.
@@ -1764,34 +1764,77 @@ class Driver(ArmDriverAbstract):
         if joint_index not in self._JOINT_INDEX_LIST:
             raise ValueError(f"Joint index should be {self._JOINT_INDEX_LIST}")
 
-        if joint_index == 255:
-            return self._all_joints_bool(lambda i: self.calibrate_joint(i))
-        else:
-            # Clear previous response
-            self._clear_resp_set_instruction()
+        # Clear previous response
+        self._clear_resp_set_instruction()
 
-            def request() -> None:
-                self._send_msg(
-                    self._MSG_JointConfig(
-                        joint_index=joint_index,
-                        set_motor_current_pos_as_zero=0xAE
-                    )
+        def request() -> None:
+            self._send_msg(
+                self._MSG_JointConfig(
+                    joint_index=joint_index,
+                    set_motor_current_pos_as_zero=0xAE
                 )
-
-            def get_value() -> bool:
-                return (
-                    self._parser.resp_set_instruction.msg.is_set_zero_successfully
-                    == 1
-                )
-
-            res = self._resp_set_instruction_get(
-                request=request,
-                get_value=get_value,
-                instruction_index=0x75,
-                timeout=timeout,
-                stamp_key=f"calibrate_joint:{joint_index}",
             )
-            return bool(res)
+
+        def get_value() -> bool:
+            return (
+                self._parser.resp_set_instruction.msg.is_set_zero_successfully
+                == 1
+            )
+
+        res = self._resp_set_instruction_get(
+            request=request,
+            get_value=get_value,
+            instruction_index=0x75,
+            timeout=timeout,
+            stamp_key=f"calibrate_joint:{joint_index}",
+        )
+        return bool(res)
+
+    def clear_joint_error(
+        self,
+        joint_index: Literal[1, 2, 3, 4, 5, 6, 255] = 255,
+        timeout: float = 1.0,
+    ) -> bool:
+        """Clear joint error code.
+
+        Parameters
+        ----------
+        `joint_index`: Literal[1, 2, 3, 4, 5, 6, 255]
+        - 1~6: clear error code on the specified joint.
+        - 255: clear error code on all joints.
+
+        `timeout`: float, optional
+        - Wait time in seconds. Default is 1.0.
+
+        Returns
+        -------
+        bool
+            True if ACK/response is received within `timeout`, False otherwise.
+
+            Notes
+            -----
+            See `Driver` docstring: Common conventions -> `set_*` return semantics.
+            This API is ACK-only and does not include a read-back verifier.
+        """
+        # Input validation
+        self._ctx._validate_timeout(timeout)
+        if joint_index not in self._JOINT_INDEX_LIST:
+            raise ValueError(f"Joint index should be {self._JOINT_INDEX_LIST}")
+
+        def request() -> None:
+            self._send_msg(
+                self._MSG_JointConfig(
+                    joint_index=joint_index,
+                    clear_joint_err=0xAE,
+                )
+            )
+
+        return self._ack_only_set(
+            request=request,
+            instruction_index=0x75,
+            timeout=timeout,
+            stamp_key=f"clear_joint_error:{joint_index}",
+        )
 
     def set_joint_angle_vel_limits(
         self,

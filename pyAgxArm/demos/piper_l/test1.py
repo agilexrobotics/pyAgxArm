@@ -281,6 +281,7 @@ while True:
 #     time.sleep(0.01)
 
 # print(robot.calibrate_joint(1))
+# print(robot.clear_joint_error(1))
 
 # -----------------------------------------------------------------------------------------------
 
