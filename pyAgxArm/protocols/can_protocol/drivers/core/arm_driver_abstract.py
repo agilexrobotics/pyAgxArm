@@ -9,7 +9,7 @@ from ...msgs.core import AttributeBase, MessageAbstract
 from .protocol_parser_interface import ProtocolParserInterface
 from .protocol_parser_abstract import DriverAPIOptions
 from ..core.arm_driver_context import ArmDriverContext
-from .....utiles.vaildator import Validator
+from .....utiles.validator import Validator
 from .....utiles.mdh_kinematics import (
     fk_from_mdh,
     get_mdh

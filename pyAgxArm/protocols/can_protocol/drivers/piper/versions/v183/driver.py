@@ -2,7 +2,7 @@ from typing_extensions import Literal
 
 from ...default.driver import Driver as DefaultDriver
 from .......utiles.numeric_codec import NumericCodec as nc
-from .......utiles.vaildator import Validator
+from .......utiles.validator import Validator
 
 
 class Driver(DefaultDriver):

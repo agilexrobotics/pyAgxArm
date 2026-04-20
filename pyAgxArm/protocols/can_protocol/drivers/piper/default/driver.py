@@ -10,7 +10,7 @@ from ......utiles.numeric_codec import (
     RAD2DEG,
     DEG2RAD,
 )
-from ......utiles.vaildator import Validator
+from ......utiles.validator import Validator
 from ....msgs.piper.default import (
     ArmMsgModeCtrl,
     ArmMsgFeedbackJointStates,

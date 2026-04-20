@@ -1,7 +1,7 @@
 from typing_extensions import Literal
 
 from .......utiles.numeric_codec import NumericCodec as nc
-from .......utiles.vaildator import Validator
+from .......utiles.validator import Validator
 from ..v183.driver import Driver as V183Driver
 from .....msgs.piper.versions import ArmMsgFeedbackStatusEnumV188, ArmMsgModeCtrlV188
 from .parser import Parser, PiperV188DriverAPIProtoAdapter
