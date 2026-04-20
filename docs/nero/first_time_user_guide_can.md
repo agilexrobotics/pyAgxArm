@@ -65,7 +65,7 @@ This switches the arm to normal mode, enables CAN push, and the arm will auto-en
 
 Example of normal `candump can0` data stream:
 
-![alt text](../../asserts/pictures/candump_can0.png)
+![alt text](../../assets/pictures/candump_can0.png)
 
 Attached is a code snippet showing how to read joint data after enabling CAN mode. Note that `robot.set_normal_mode()` is commented out here; you can enable it as needed.:
 
@@ -174,7 +174,7 @@ while not robot.enable():
 
 执行 `candump can0`，正常的数据流如下：
 
-![alt text](../../asserts/pictures/candump_can0.png)
+![alt text](../../assets/pictures/candump_can0.png)
 
 附上一段开启 CAN 模式后，读取关节数据的代码，注意这里将 `robot.set_normal_mode()` 注释掉了，可以按需开启。
 

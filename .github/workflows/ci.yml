@@ -8,7 +8,7 @@ on:
       - "**/*.sh"
       - "docs/**"
       - "pyAgxArm/scripts/**"
-      - "asserts/**"
+      - "assets/**"
       - "pyAgxArm/demos/**"
   pull_request:
     paths-ignore:
@@ -16,7 +16,7 @@ on:
       - "**/*.sh"
       - "docs/**"
       - "pyAgxArm/scripts/**"
-      - "asserts/**"
+      - "assets/**"
       - "pyAgxArm/demos/**"
 
 jobs:
