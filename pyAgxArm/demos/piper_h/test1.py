@@ -68,6 +68,46 @@ end_effector = robot.init_effector(robot.OPTIONS.EFFECTOR.AGX_GRIPPER)
 print(end_effector.__doc__)
 
 
+# -------------------------- Factory ---------------------------
+
+# AgxArmFactory.set_reuse_policy("new")
+
+# robots = []
+
+# for i in range(3):
+#     robot = AgxArmFactory.create_arm(robot_cfg)
+#     robot.connect()
+#     robots.append(robot)
+
+# policy = AgxArmFactory.get_reuse_policy()
+# print(policy)
+
+# # When an old instance is no longer referenced,
+# # it will be automatically reclaimed by the garbage collector.
+# if policy == "new":
+#     for robot in robots:
+#         print(id(robot), robot.is_connected())
+
+#     # After the list reference is deleted,
+#     # the garbage collection mechanism will disconnect the first two instances
+#     # and clear the cached items.
+#     del robots
+#     print(id(robot), robot.is_connected())
+
+# # If the configured fingerprints are the same,
+# # the previously created old instance will be returned.
+# elif policy == "reuse":
+#     for robot in robots:
+#         print(id(robot), robot.is_connected())
+
+# # If the configured fingerprints are the same,
+# # disconnect the old instance first,
+# # then recreate and return the new instance.
+# elif policy == "replace":
+#     for robot in robots:
+#         print(id(robot), robot.is_connected())
+
+
 # -------------------------- Config ---------------------------
 
 # robot.set_auto_set_motion_mode_enabled(False)
@@ -137,9 +177,21 @@ print(end_effector.__doc__)
 
 # -------------------------- Get data -------------------------
 
-
 while True:
     break
+
+    # print(robot.is_connected())
+    # print(robot.has_comm_error())
+    # print(robot.get_comm_error())
+
+    # if not robot.is_connected() or robot.has_comm_error():
+    #     try:
+    #         if robot.has_comm_error():
+    #             print(robot.get_comm_error())
+    #         robot.reconnect()
+    #     except Exception as exc:
+    #         print("Reconnect:", exc)
+    #         time.sleep(1)
 
     # print(robot.get_fps())
     # print(robot.is_ok())

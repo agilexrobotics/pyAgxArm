@@ -17,10 +17,6 @@ class CommInterface(ABC):
         ...
 
     @abstractmethod
-    def is_stopped(self) -> bool:
-        ...
-
-    @abstractmethod
     def get_status(self) -> Any:
         ...
 

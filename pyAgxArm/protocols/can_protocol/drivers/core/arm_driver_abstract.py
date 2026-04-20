@@ -1,4 +1,5 @@
 import threading
+import weakref
 from typing import Optional, TYPE_CHECKING, overload, List
 
 from typing_extensions import Literal
@@ -35,6 +36,17 @@ class ArmDriverAbstract(ArmDriverInterface):
 
     _Parser = ProtocolParserInterface
 
+    @staticmethod
+    def _shutdown_ctx_on_finalize(ctx: DriverContext) -> None:
+        """Best-effort cleanup when driver instance is garbage collected."""
+        try:
+            ctx.shutdown()
+            ctx._parser_packet_fun_list.clear()
+            ctx._data_monitor_fun_list.clear()
+        except Exception:
+            # Finalizer must never raise; explicit disconnect remains preferred.
+            pass
+
     @property
     def OPTIONS(self):
         return DriverAPIOptions
@@ -46,6 +58,11 @@ class ArmDriverAbstract(ArmDriverInterface):
     def __init__(self, config: dict):
         self._config = config.copy()
         self._ctx = DriverContext(config)
+        self._gc_finalizer = weakref.finalize(
+            self,
+            self._shutdown_ctx_on_finalize,
+            self._ctx,
+        )
         self._connected = False
         self._effector_kind: Optional[str] = None
         self._effector = None
@@ -186,6 +203,12 @@ class ArmDriverAbstract(ArmDriverInterface):
     def create_comm(self, config: Optional[dict] = None, comm: str = "can"):
         return self._ctx.create_comm(config, comm)
 
+    def has_comm_error(self) -> bool:
+        return self._ctx.has_comm_error()
+    
+    def get_comm_error(self):
+        return self._ctx.get_comm_error()
+
     def connect(self, start_read_thread: bool = True) -> None:
         """
         Initialize and connect the underlying communication, optionally
@@ -195,6 +218,8 @@ class ArmDriverAbstract(ArmDriverInterface):
         will be ignored. Use `disconnect()` to stop threads and close comm
         when the driver instance is no longer needed.
         """
+        if self._ctx.has_comm_error():
+            self.disconnect()
         comm = self._ctx.get_comm()
         if comm is None:
             comm = self._ctx.init_comm()
@@ -220,13 +245,24 @@ class ArmDriverAbstract(ArmDriverInterface):
         and before creating a new instance.
         """
         with self._lock:
-            if not self._connected and (not self._ctx.get_comm() or self._ctx.get_comm().is_stopped()):
-                # Already disconnected or fully stopped
+            if not self._connected and self._ctx.get_comm() is None:
+                # Already disconnected and comm torn down
                 return
             self._connected = False
 
         # Stop internal DriverContext threads and FPS manager, and close comm
         self._ctx.shutdown(join_timeout=join_timeout)
+
+    def reconnect(self, join_timeout: float = 1.0, start_read_thread: bool = True) -> None:
+        """
+        Explicitly rebuild the current connection session.
+
+        This is the recommended recovery path after a communication error or
+        device reconnect event: fully disconnect the current session first,
+        then create a fresh connection and restart background threads.
+        """
+        self.disconnect(join_timeout=join_timeout)
+        self.connect(start_read_thread=start_read_thread)
 
     def is_connected(self) -> bool:
         comm = self._ctx.get_comm()

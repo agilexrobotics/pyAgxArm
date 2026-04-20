@@ -31,6 +31,12 @@ class DriverContext:
         # Key is an arbitrary string (e.g. "firmware", "joint_acc:3").
         self._req_stamp: Dict[str, float] = {}
 
+    def has_comm_error(self) -> bool:
+        return self._read_error is not None
+    
+    def get_comm_error(self):
+        return self._read_error
+
     def _resolve_comm_config(self, config: Optional[dict], comm: str) -> dict:
         source = config if config is not None else self._config
         if not source:
@@ -163,7 +169,7 @@ class DriverContext:
         Fully shut down communication and clean up threads/resources.
 
         - Stop internal threads and FPSManager
-        - Close underlying comm and clear callbacks
+        - Close underlying comm callback and session resources
         """
         # Stop internal threads first
         self.stop_th(join_timeout=join_timeout)
@@ -187,18 +193,17 @@ class DriverContext:
             self.comm = None
             self._comm_initialized = False
             self._read_error = None
+        self._req_stamp.clear()
 
     def _read_loop(self):
         while not self._read_stop_event.is_set():
             try:
-                rx_msg = self.comm.recv()
+                self.comm.recv()
             except Exception as exc:
                 self._read_error = exc
                 self._read_stop_event.set()
                 self._monitor_stop_event.set()
-                break
-            if rx_msg is None:
-                time.sleep(0.0005)
+                raise
 
     def _monitor_loop(self):
         while not self._monitor_stop_event.is_set():
@@ -228,7 +233,8 @@ class DriverContext:
             True if `func()` returned True before timeout, False otherwise.
         """
         self._validate_timeout(timeout)
-        self._raise_if_read_failed()
+        if self.has_comm_error():
+            return False
 
         if timeout == 0.0:
             # Non-blocking mode.
@@ -236,19 +242,12 @@ class DriverContext:
 
         start_time = time.time()
         while time.time() - start_time < timeout:
-            self._raise_if_read_failed()
+            if self.has_comm_error():
+                return False
             if func():
                 return True
             time.sleep(0.0005)
         return False
-
-    def _raise_if_read_failed(self) -> None:
-        if self._read_error is None:
-            return
-        raise RuntimeError(
-            "Background CAN receive loop stopped because of a communication error. "
-            "Reconnect the device and retry."
-        ) from self._read_error
 
     def _request_and_get(
         self,

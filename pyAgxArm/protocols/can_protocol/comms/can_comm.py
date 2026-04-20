@@ -1,15 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+import errno
+import time
 
 import can
 from can.message import Message
-from enum import IntEnum, auto
+from typing import Optional
 from platform import system
 
 from .core.can_comm_base import CanCommBase
 from .can_sys_utils import CanSystemInfoBase, LinuxSocketCanSystemInfo
 
 _SUPPORTED_PLATFORMS = {"Linux", "Windows", "Darwin"}
+
+_CAN_LINK_DOWN_WARN_INTERVAL_S = 1.0
+_CAN_SEND_ENOBUFS_WARN_INTERVAL_S = 1.0
 
 
 def create_can_comm_config(
@@ -39,10 +44,6 @@ class CanComm:
     """
     Platform selector for python-can based communication.
     """
-
-    def __init__(self, config: dict, comm_type: str = "can"):
-        pass
-
     def __new__(cls, config: dict, comm_type: str = "can"):
         platform_system = system()
         if platform_system not in _SUPPORTED_PLATFORMS:
@@ -55,43 +56,13 @@ class CanComm:
 
 
 class CanCommImpl(CanCommBase):
-    class CAN_STATUS(IntEnum):
-        UNKNOWN = 100001
-        INIT_CAN_BUS_IS_EXIST = auto()
-        INIT_CAN_BUS_OPENED_SUCCESS = auto()
-        INIT_CAN_BUS_OPENED_FAILED = auto()
-        CLOSE_CAN_BUS_CONNECT_SHUT_DOWN = auto()
-        CLOSE_CAN_BUS_WAS_NOT_PROPERLY_INIT = auto()
-        CLOSE_SHUTTING_DOWN_CAN_BUS_ERR = auto()
-        CLOSED_CAN_BUS_NOT_OPEN = auto()
-        READ_CAN_MSG_OK = auto()
-        READ_CAN_MSG_OK_NO_CB = auto()
-        READ_CAN_MSG_TIMEOUT = auto()
-        READ_CAN_MSG_FAILED = auto()
-        SEND_MESSAGE_SUCCESS = auto()
-        SEND_MESSAGE_FAILED = auto()
-        SEND_CAN_BUS_NOT_OK = auto()
-        BUS_STATE_ACTIVE = auto()
-        BUS_STATE_PASSIVE = auto()
-        BUS_STATE_ERROR = auto()
-        BUS_STATE_UNKNOWN = auto()
-
-        def __str__(self):
-            return f"{self.name} ({self.value})"
-
-        def __repr__(self):
-            return f"{self.name}: {self.value}"
-
     def __init__(self, config: dict, comm_type: str = "can") -> None:
         super().__init__()
         self.recv_bus = None
         self.send_bus = None
-        self.sysinfo: CanSystemInfoBase = None
-        self._last_recv_error = None
+        self.sysinfo: Optional[CanSystemInfoBase] = None
         self._config = config.copy()
-        self._comm_type = comm_type
-        self._platform_system = system()
-        self._type = self._comm_type
+        self._type = comm_type
         self._channel = self._config["channel"]
         self._interface = (
             self._config["interface"]
@@ -105,11 +76,13 @@ class CanCommImpl(CanCommBase):
         self._receive_own_messages = self._config.get("receive_own_messages", False)
         self._local_loopback = self._config.get("local_loopback", False)
         self._is_connected = False
-        self._is_stopped = False
-        if self._interface == "socketcan":
+        self._can_link_down_next_warn_at = 0.0
+        self._can_link_down_active = False
+        self._can_send_enobufs_next_warn_at = 0.0
+        if system() == "Linux" and self._interface == "socketcan":
             self.sysinfo = LinuxSocketCanSystemInfo
         if self._enable_check_can and self.sysinfo is not None:
-            self.check_can()
+            self._check_can_status()
         if self._auto_connect:
             self.connect()
 
@@ -119,25 +92,120 @@ class CanCommImpl(CanCommBase):
         except Exception:
             pass
 
-    @staticmethod
-    def _shutdown_bus(bus) -> None:
-        if bus is None:
-            return
-        try:
-            bus.shutdown()
-        except Exception:
-            pass
+    def _print_log(self, log_type: str, message: str) -> None:
+        ts = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+        ms = int((time.time() % 1) * 1000)
+        print(f"[{ts}.{ms:03d}] [{log_type}] [{self._channel}] {message}")
 
-    def _reset_connection_state(self) -> None:
-        self.recv_bus = None
-        self.send_bus = None
-        self._last_recv_error = None
-        self._is_connected = False
-        self._is_stopped = False
+    def _check_can_status(self) -> None:
+        if not self.sysinfo.is_exists(self._channel):
+            raise ValueError(f"Device '{self._channel}' does not exist.")
+        if not self.sysinfo.is_up(self._channel):
+            self._can_link_down_active = True
+            self._can_link_down_next_warn_at = (
+                time.monotonic() + _CAN_LINK_DOWN_WARN_INTERVAL_S
+            )
+            self._print_log(
+                "WARN",
+                "Device is DOWN.",
+            )
+        actual_bitrate = self.sysinfo.get_bitrate(self._channel)
+        if (
+            self._bitrate is not None
+            and actual_bitrate is not None
+            and actual_bitrate != self._bitrate
+        ):
+            self._print_log(
+                "WARN",
+                f"CAN port {self._channel} bitrate is {actual_bitrate} bps, expected {self._bitrate} bps.",
+            )
+
+    def _classify_can_error(self, exc: Exception) -> Optional[str]:
+        """
+        Classify CAN send/recv exceptions.
+
+        Returns
+        -------
+        - "hard_disconnect": device/netdev disappears (e.g. USB-CAN unplugged).
+        - "link_down": interface is down (ENETDOWN-like)
+        - "no_buffer": tx queue/buffer full (ENOBUFS-like)
+        - None: unknown/unclassified error (caller should decide whether to raise)
+
+        Notes
+        -----
+        - For send path, "no_buffer" / "link_down" are treated as tolerable and
+          can be absorbed with warning prints.
+        - For recv path, only "link_down" is treated as tolerable; "no_buffer"
+          is generally a TX-side condition.
+        """
+        if self.sysinfo is not None and not self.sysinfo.is_exists(self._channel):
+            return "hard_disconnect"
+        candidates = [exc, getattr(exc, "__cause__", None), getattr(exc, "__context__", None)]
+        for err in candidates:
+            if err is None:
+                continue
+            if isinstance(err, OSError):
+                eno = getattr(err, "errno", None)
+                if eno == errno.ENETDOWN:
+                    return "link_down"
+                if eno == errno.ENODEV:
+                    return "hard_disconnect"
+                if eno == errno.ENOBUFS:
+                    return "no_buffer"
+            err_text = str(err).lower()
+            if (
+                "no buffer space available" in err_text
+                or "transmit buffer full" in err_text
+                or "buffer full" in err_text
+            ):
+                return "no_buffer"
+            if "network is down" in err_text:
+                return "link_down"
+            if "no such device" in err_text:
+                return "hard_disconnect"
+        return None
+
+    def _notify_can_link_down(self) -> None:
+        self._can_link_down_active = True
+        now = time.monotonic()
+        if now < self._can_link_down_next_warn_at:
+            return
+        self._can_link_down_next_warn_at = (
+            now + _CAN_LINK_DOWN_WARN_INTERVAL_S
+        )
+        self._print_log(
+            "WARN",
+            f"Device is DOWN.",
+        )
+
+    def _notify_can_send_enobufs(self) -> None:
+        now = time.monotonic()
+        if now < self._can_send_enobufs_next_warn_at:
+            return
+        self._can_send_enobufs_next_warn_at = (
+            now + _CAN_SEND_ENOBUFS_WARN_INTERVAL_S
+        )
+        self._print_log(
+            "WARN",
+            "Send buffer is FULL.",
+        )
+
+    def _check_can_link_up(self) -> None:
+        if not self._can_link_down_active:
+            return
+        if self.sysinfo and not self.sysinfo.is_up(self._channel):
+                self._notify_can_link_down()
+        else:
+            self._print_log(
+                "INFO",
+                "Device is UP.",
+            )
+            self._can_link_down_active = False
+            self._can_link_down_next_warn_at = 0.0
 
     def connect(self, **kwargs):
         if self.recv_bus is not None and self.send_bus is not None:
-            return True
+            return
 
         common_kwargs = dict(
             channel=self._channel,
@@ -147,129 +215,83 @@ class CanCommImpl(CanCommBase):
             local_loopback=self._local_loopback,
         )
 
-        recv_bus = None
-        send_bus = None
         try:
-            recv_bus = can.ThreadSafeBus(**common_kwargs)
-            if self._interface == "socketcan":
-                send_bus = can.ThreadSafeBus(**common_kwargs)
+            self.recv_bus = can.interface.Bus(**common_kwargs)
+            self.send_bus = self.recv_bus
+            if self.sysinfo:
+                # self.send_bus = can.interface.Bus(**common_kwargs)
+                pass
             else:
-                send_bus = recv_bus
-        except Exception as exc:
-            self._shutdown_bus(recv_bus)
-            if send_bus is not recv_bus:
-                self._shutdown_bus(send_bus)
-            self._reset_connection_state()
+                self._can_link_down_active = False
+                self._can_link_down_next_warn_at = 0.0
+            self._is_connected = True
+        except:
+            self.close()
             raise can.CanInitializationError(
-                f"Failed to open CAN bus on {self._platform_system} "
-                f"(interface='{self._interface}', channel='{self._channel}', bitrate={self._bitrate}): {exc}"
-            ) from exc
-
-        self.recv_bus = recv_bus
-        self.send_bus = send_bus
-        self._last_recv_error = None
-        self._is_connected = True
-        self._is_stopped = False
-        return True
+                f"Failed to open CAN bus "
+                f"(interface='{self._interface}', "
+                f"channel='{self._channel}', "
+                f"bitrate={self._bitrate})."
+            )
 
     def close(self):
-        recv_bus = getattr(self, "recv_bus", None)
-        send_bus = getattr(self, "send_bus", None)
-        if recv_bus is None or send_bus is None:
-            return self.CAN_STATUS.CLOSED_CAN_BUS_NOT_OPEN
+        try:
+            self.recv_bus.shutdown()
+        except Exception:
+            pass
+
+        try:
+            self.send_bus.shutdown()
+        except Exception:
+            pass
 
         self.recv_bus = None
         self.send_bus = None
-        try:
-            recv_bus.shutdown()
-            if send_bus is not recv_bus:
-                send_bus.shutdown()
-            self._last_recv_error = None
-            self._is_connected = False
-            self._is_stopped = True
-            return self.CAN_STATUS.CLOSE_CAN_BUS_CONNECT_SHUT_DOWN
-        except AttributeError:
-            return self.CAN_STATUS.CLOSE_CAN_BUS_WAS_NOT_PROPERLY_INIT
-        except Exception:
-            return self.CAN_STATUS.CLOSE_SHUTTING_DOWN_CAN_BUS_ERR
+        self._is_connected = False
 
     def send(self, msg: Message, timeout=None):
         if self.send_bus is None:
-            raise RuntimeError("CAN bus is not connected. Call `connect()` first.")
-
-        bus_status = self._get_states(self.send_bus)
-        if bus_status != self.CAN_STATUS.BUS_STATE_ACTIVE:
-            raise can.CanOperationError(
-                f"CAN bus is not active for send "
-                f"(interface='{self._interface}', channel='{self._channel}', status={bus_status})."
-            )
+            self.close()
+            raise RuntimeError("CAN bus is not connected.")
 
         try:
             self.send_bus.send(msg, timeout)
-            return True
+            self._check_can_link_up()
         except Exception as exc:
-            raise can.CanOperationError(
-                f"Failed to send CAN message on interface='{self._interface}', "
-                f"channel='{self._channel}': {exc}"
-            ) from exc
+            err_kind = self._classify_can_error(exc)
+            if err_kind == "hard_disconnect":
+                self.close()
+                raise RuntimeError(
+                    f"Device '{self._channel}' is disconnected."
+                ) from None
+            if err_kind == "no_buffer":
+                self._notify_can_send_enobufs()
+                return
+            if err_kind == "link_down":
+                self._notify_can_link_down()
+                return
+            raise
 
     def recv(self):
         if self.recv_bus is None:
-            raise RuntimeError("CAN bus is not connected. Call `connect()` first.")
-
-        can_bus_status = self._get_states(self.recv_bus)
-        if can_bus_status not in {
-            self.CAN_STATUS.BUS_STATE_ACTIVE,
-            self.CAN_STATUS.BUS_STATE_PASSIVE,
-            self.CAN_STATUS.BUS_STATE_UNKNOWN,
-        }:
-            raise can.CanOperationError(
-                f"CAN bus is not readable on interface='{self._interface}', "
-                f"channel='{self._channel}', status={can_bus_status}."
-            )
+            self.close()
+            raise RuntimeError("CAN bus is not connected.")
 
         try:
-            rx_message = self._read_message()
+            msg = self.recv_bus.recv(self._timeout)
+            if msg is not None:
+                if not msg.is_error_frame:
+                    self._trigger_callback(msg)
+                    return msg
+            self._check_can_link_up()
         except Exception as exc:
-            self._last_recv_error = exc
-            raise can.CanOperationError(
-                f"Failed to receive CAN message on interface='{self._interface}', "
-                f"channel='{self._channel}': {exc}"
-            ) from exc
-
-        if rx_message is None:
-            return None
-        if self.has_callback():
-            self._trigger_callback(rx_message)
-        return rx_message
-
-    def _read_message(self):
-        return self.recv_bus.recv(self._timeout)
-
-    def _get_states(self, bus=None):
-        if isinstance(bus, can.BusABC):
-            bus_state = bus.state
-        else:
-            bus_state = None
-        if bus_state == can.BusState.ACTIVE:
-            return self.CAN_STATUS.BUS_STATE_ACTIVE
-        if bus_state == can.BusState.PASSIVE:
-            return self.CAN_STATUS.BUS_STATE_PASSIVE
-        if bus_state == can.BusState.ERROR:
-            return self.CAN_STATUS.BUS_STATE_ERROR
-        return self.CAN_STATUS.BUS_STATE_UNKNOWN
-
-    def check_can(self):
-        if not self.sysinfo.is_exists(self._channel):
-            raise ValueError(f"CAN socket {self._channel} does not exist.")
-        if not self.sysinfo.is_up(self._channel):
-            raise RuntimeError(f"CAN port {self._channel} is not UP.")
-        actual_bitrate = self.sysinfo.get_bitrate(self._channel)
-        if (
-            self._bitrate is not None
-            and actual_bitrate is not None
-            and actual_bitrate != self._bitrate
-        ):
-            raise ValueError(
-                f"CAN port {self._channel} bitrate is {actual_bitrate} bps, expected {self._bitrate} bps."
-            )
+            err_kind = self._classify_can_error(exc)
+            if err_kind == "hard_disconnect":
+                self.close()
+                raise RuntimeError(
+                    f"Device '{self._channel}' is disconnected."
+                ) from None
+            if err_kind == "link_down":
+                self._notify_can_link_down()
+                return
+            raise

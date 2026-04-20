@@ -12,9 +12,8 @@ class CanCommBase(CommAbstract):
         self._type = ""
         self._channel = ""
         self._is_connected = False
-        self._is_stopped = False
 
-    def connect(self, **kwargs) -> bool:
+    def connect(self, **kwargs) -> None:
         raise NotImplementedError
 
     def is_connected(self) -> bool:
@@ -22,9 +21,6 @@ class CanCommBase(CommAbstract):
 
     def close(self) -> Any:
         raise NotImplementedError
-
-    def is_stopped(self) -> bool:
-        return self._is_stopped
 
     def get_status(self) -> Any:
         raise NotImplementedError
@@ -38,7 +34,7 @@ class CanCommBase(CommAbstract):
     def get_channel(self) -> str:
         return self._channel
 
-    def send(self, message: Message, **kwargs) -> Any:
+    def send(self, message: Message, **kwargs) -> None:
         raise NotImplementedError
 
     def recv(self, **kwargs) -> Optional[Message]:

@@ -95,6 +95,27 @@ def test_piper_only_set_payload_smoke():
         device.stop()
 
 
+def test_piper_reconnect_restores_virtual_session():
+    channel = new_virtual_channel("ci_piper_reconnect")
+    device = PiperCanSlave(channel=channel)
+    device.start()
+    try:
+        arm = _make_piper_arm(PiperFW.DEFAULT, channel)
+        arm.connect()
+        arm.set_speed_percent(100)
+        assert wait_until(lambda: len(device.host_frames) > 0)
+
+        frames_before_reconnect = len(device.host_frames)
+        arm.reconnect()
+        assert arm.is_connected()
+
+        arm.set_speed_percent(80)
+        assert wait_until(lambda: len(device.host_frames) > frames_before_reconnect)
+        arm.disconnect()
+    finally:
+        device.stop()
+
+
 def test_piper_read_apis_with_virtual_feedback():
     channel = new_virtual_channel("ci_piper_read")
     device = PiperCanSlave(channel=channel)

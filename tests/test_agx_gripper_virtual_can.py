@@ -55,8 +55,12 @@ def test_agx_gripper_read_and_control_apis_l2():
             gripper.move_gripper(0.01, force=1.0)
 
         assert wait_until(lambda: len(slave.host_frames) > n0)
-        assert gripper.get_gripper_status() is not None
-        assert gripper.get_gripper_ctrl_states() is not None
+        # Slave replies with 0x2A8 then 0x159; the read thread handles one frame per
+        # recv() tick, so status may appear before ctrl feedback without a short wait.
+        assert wait_until(
+            lambda: gripper.get_gripper_status() is not None
+            and gripper.get_gripper_ctrl_states() is not None
+        )
         assert isinstance(gripper.disable_gripper(), bool)
         assert isinstance(gripper.reset_gripper(), bool)
         assert isinstance(gripper.calibrate_gripper(), bool)
