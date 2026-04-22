@@ -14,10 +14,6 @@
             "receive_own_messages": false
         }
     },
-    "log": {
-        "level": "INFO",
-        "path": ""
-    },
     "auto_set_motion_mode": true,
     "enable_joint_limits": true,
     "joint_names": [

@@ -10,3 +10,4 @@ build
 *.so
 temp
 .pytest_cache/
+pyAgxArm/.log/*.log

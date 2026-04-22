@@ -155,10 +155,6 @@ Example return structure:
 {
     "robot": "nero",
     "firmeware_version": "default",
-    "log": {
-        "level": "INFO",
-        "path": ""
-    },
     "joint_names": ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6", "joint7"],
     "joint_limits": {
         "joint1": [-2.705261, 2.705261],
@@ -1840,10 +1836,6 @@ create_agx_arm_config(
 {
     "robot": "nero",
     "firmeware_version": "default",
-    "log": {
-        "level": "INFO",
-        "path": ""
-    },
     "joint_names": ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6", "joint7"],
     "joint_limits": {
         "joint1": [-2.705261, 2.705261],

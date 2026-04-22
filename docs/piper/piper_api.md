@@ -178,10 +178,6 @@ Example return structure:
 {
     "robot": "piper",
     "firmeware_version": "default",
-    "log": {
-        "level": "INFO",
-        "path": ""
-    },
     "joint_names": ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6"],
     "joint_limits": {
         "joint1": [-2.617994, 2.617994],
@@ -2579,10 +2575,6 @@ create_agx_arm_config(
 {
     "robot": "piper",
     "firmeware_version": "default",
-    "log": {
-        "level": "INFO",
-        "path": ""
-    },
     "joint_names": ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6"],
     "joint_limits": {
         "joint1": [-2.617994, 2.617994],
