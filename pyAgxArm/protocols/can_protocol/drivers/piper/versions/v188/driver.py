@@ -162,35 +162,35 @@ class Driver(V183Driver):
         lower_limit, upper_limit = self._mit_position_limits(joint_index)
 
         if not Validator.is_within_limit(p_des, lower_limit, upper_limit):
-            print(
+            self.log.warning(
                 f"Warning: Desired position {p_des} rad is outside "
                 f"joint {joint_index} limits [{lower_limit}, {upper_limit}] rad. "
             )
             p_des = Validator.clamp(p_des, lower_limit, upper_limit)
 
         if not Validator.is_within_limit(v_des, -45.0, 45.0):
-            print(
+            self.log.warning(
                 f"Warning: Desired velocity {v_des} rad/s is outside "
                 f"joint {joint_index} limits [-45.0, 45.0] rad/s. "
             )
             v_des = Validator.clamp(v_des, -45.0, 45.0)
 
         if not Validator.is_within_limit(kp, 0.0, 500.0):
-            print(
+            self.log.warning(
                 f"Warning: Proportional gain {kp} is outside "
                 f"joint {joint_index} limits [0.0, 500.0]. "
             )
             kp = Validator.clamp(kp, 0.0, 500.0)
 
         if not Validator.is_within_limit(kd, -5.0, 5.0):
-            print(
+            self.log.warning(
                 f"Warning: Derivative gain {kd} is outside "
                 f"joint {joint_index} limits [-5.0, 5.0]. "
             )
             kd = Validator.clamp(kd, -5.0, 5.0)
 
         if not Validator.is_within_limit(t_ff, -16.0, 16.0):
-            print(
+            self.log.warning(
                 f"Warning: Feed-forward torque {t_ff} N·m is outside "
                 f"joint {joint_index} limits [-16.0, 16.0]. "
             )

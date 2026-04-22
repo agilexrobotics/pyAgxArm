@@ -9,6 +9,7 @@ from ...msgs.core import AttributeBase, MessageAbstract
 from .protocol_parser_interface import ProtocolParserInterface
 from .protocol_parser_abstract import DriverAPIOptions
 from ..core.arm_driver_context import ArmDriverContext
+from .....utiles.logger import Logger
 from .....utiles.validator import Validator
 from .....utiles.mdh_kinematics import (
     fk_from_mdh,
@@ -37,9 +38,14 @@ class ArmDriverAbstract(ArmDriverInterface):
     _Parser = ProtocolParserInterface
 
     @staticmethod
-    def _shutdown_ctx_on_finalize(ctx: DriverContext) -> None:
+    def _shutdown_ctx_on_finalize(
+        ctx: DriverContext,
+        log: Optional[Logger] = None,
+    ) -> None:
         """Best-effort cleanup when driver instance is garbage collected."""
         try:
+            if log is not None:
+                log.shutdown()
             ctx.shutdown()
             ctx._parser_packet_fun_list.clear()
             ctx._data_monitor_fun_list.clear()
@@ -57,21 +63,35 @@ class ArmDriverAbstract(ArmDriverInterface):
 
     def __init__(self, config: dict):
         self._config = config.copy()
-        self._ctx = DriverContext(config)
+        _id = format(id(self), "x")
+        _robot = self._config["robot"]
+        _comm_cfg = self._config["comm"]
+        self._comm_type = _comm_cfg["type"]
+        self._comm_channel = _comm_cfg[self._comm_type]["channel"]
+        self.log = Logger("%s.%s.%s" % (_robot, self._comm_channel, _id))
+        self._validator = Validator(logger_=self.log.get_child("validator"))
+        self._ctx = DriverContext(config, logger_=self.log.get_child("ctx"))
         self._gc_finalizer = weakref.finalize(
             self,
             self._shutdown_ctx_on_finalize,
             self._ctx,
+            self.log,
         )
         self._connected = False
         self._effector_kind: Optional[str] = None
         self._effector = None
-        self._parser = self._Parser(self._ctx.fps)
+        self._parser = self._Parser(
+            self._ctx.fps,
+            logger_=self.log.get_child("parser"),
+        )
         self._arm_ctx = ArmDriverContext(config, self._ctx, self._parser)
+
+        # CONFIG
         auto_set_motion_mode = self._config.get("auto_set_motion_mode", True)
         if not isinstance(auto_set_motion_mode, bool):
             raise ValueError("Config `auto_set_motion_mode` should be bool")
         self._auto_set_motion_mode_enabled = auto_set_motion_mode
+
         enable_joint_limits = self._config.get("enable_joint_limits", True)
         if not isinstance(enable_joint_limits, bool):
             raise ValueError("Config `enable_joint_limits` should be bool")
@@ -100,6 +120,10 @@ class ArmDriverAbstract(ArmDriverInterface):
             if data is not None:
                 comm = self._ctx.get_comm()
                 if comm is None:
+                    self.log.warning(
+                        "Failed to send %s: comm is None (driver not connected).",
+                        type(msg).__name__,
+                    )
                     raise RuntimeError(
                         "Robot is not connected (comm is None). "
                         "Call `connect()` before sending commands."
@@ -107,6 +131,14 @@ class ArmDriverAbstract(ArmDriverInterface):
                 try:
                     comm.send(data)
                 except Exception as exc:
+                    self.log.error(
+                        "Failed to send %s on channel '%s' (%s: %s).",
+                        type(msg).__name__,
+                        comm.get_channel(),
+                        type(exc).__name__,
+                        exc,
+                        exc_info=True,
+                    )
                     raise RuntimeError(
                         f"Failed to send {type(msg).__name__} on channel '{comm.get_channel()}': {exc}"
                     ) from exc
@@ -181,21 +213,36 @@ class ArmDriverAbstract(ArmDriverInterface):
             )
 
         effector_kind = str(effector).strip().lower()
+        try:
+            if effector_kind == self.OPTIONS.EFFECTOR.AGX_GRIPPER:
+                from ..effector.agx_gripper import AgxGripperDriverDefault
+
+                effector_driver = AgxGripperDriverDefault(
+                    self._config,
+                    self.get_context(),
+                )
+            elif effector_kind == self.OPTIONS.EFFECTOR.REVO2:
+                from ..effector.revo2 import Revo2DriverDefault
+
+                effector_driver = Revo2DriverDefault(
+                    self._config,
+                    self.get_context(),
+                )
+            else:
+                raise ValueError(f"Unsupported effector kind: {effector}")
+        except Exception as exc:
+            self.log.error(
+                "Init effector '%s' failed (%s: %s).",
+                effector_kind,
+                type(exc).__name__,
+                exc,
+                exc_info=True,
+            )
+            raise
+
         self._effector_kind = effector_kind
-
-        if effector_kind == self.OPTIONS.EFFECTOR.AGX_GRIPPER:
-            from ..effector.agx_gripper import AgxGripperDriverDefault
-
-            self._effector = AgxGripperDriverDefault(self._config, self.get_context())
-            return self._effector
-
-        if effector_kind == self.OPTIONS.EFFECTOR.REVO2:
-            from ..effector.revo2 import Revo2DriverDefault
-
-            self._effector = Revo2DriverDefault(self._config, self.get_context())
-            return self._effector
-
-        raise ValueError(f"Unsupported effector kind: {effector}")
+        self._effector = effector_driver
+        return self._effector
 
     def get_driver_version(self):
         raise NotImplementedError
@@ -218,23 +265,39 @@ class ArmDriverAbstract(ArmDriverInterface):
         will be ignored. Use `disconnect()` to stop threads and close comm
         when the driver instance is no longer needed.
         """
-        if self._ctx.has_comm_error():
-            self.disconnect()
-        comm = self._ctx.get_comm()
-        if comm is None:
-            comm = self._ctx.init_comm()
-        if comm is None:
-            raise ValueError("comm is None")
-        if not comm.is_connected():
-            comm.connect()
-        if not comm.is_connected():
-            raise RuntimeError("Failed to establish robot communication.")
-        with self._lock:
-            if self._connected:
-                return
-            self._connected = True
-        if start_read_thread:
-            self._ctx.start_th()
+        try:
+            if self._ctx.has_comm_error():
+                self.disconnect()
+            comm = self._ctx.get_comm()
+            if comm is None:
+                comm = self._ctx.init_comm()
+            if comm is None:
+                raise ValueError("comm is None")
+            if not comm.is_connected():
+                comm.connect()
+            if not comm.is_connected():
+                raise RuntimeError("Failed to establish robot communication.")
+            with self._lock:
+                if self._connected:
+                    return
+                self._connected = True
+            if start_read_thread:
+                self._ctx.start_th()
+        except Exception as exc:
+            self.log.error(
+                "Connect failed for %s channel '%s' (%s: %s).",
+                self._comm_type,
+                self._comm_channel,
+                type(exc).__name__,
+                exc,
+                exc_info=True,
+            )
+            raise
+        self.log.info(
+            "Connected to %s channel '%s'.",
+            self._comm_type,
+            self._comm_channel,
+        )
 
     def disconnect(self, join_timeout: float = 1.0) -> None:
         """
@@ -245,13 +308,32 @@ class ArmDriverAbstract(ArmDriverInterface):
         and before creating a new instance.
         """
         with self._lock:
-            if not self._connected and self._ctx.get_comm() is None:
-                # Already disconnected and comm torn down
-                return
+            already_disconnected = (not self._connected and self._ctx.get_comm() is None)
             self._connected = False
 
-        # Stop internal DriverContext threads and FPS manager, and close comm
-        self._ctx.shutdown(join_timeout=join_timeout)
+        if already_disconnected:
+            self.log.shutdown()
+            return
+
+        try:
+            self._ctx.shutdown(join_timeout=join_timeout)
+        except Exception as exc:
+            self.log.error(
+                "Disconnect failed for %s channel '%s' (%s: %s).",
+                self._comm_type,
+                self._comm_channel,
+                type(exc).__name__,
+                exc,
+                exc_info=True,
+            )
+            self.log.shutdown()
+            raise
+        self.log.info(
+            "Disconnected from %s channel '%s'.",
+            self._comm_type,
+            self._comm_channel,
+        )
+        self.log.shutdown()
 
     def reconnect(self, join_timeout: float = 1.0, start_read_thread: bool = True) -> None:
         """
@@ -371,7 +453,10 @@ class ArmDriverAbstract(ArmDriverInterface):
         if flange is None:
             return None
 
-        fp = Validator.clamp_pose6(flange.msg, name="flange_pose")
+        fp = Validator.clamp_pose6(
+            flange.msg,
+            name="flange_pose"
+        )
         return MessageAbstract(
             msg_type="tcp_pose",
             msg=self._world_flange_to_tcp_noclamp(fp),

@@ -1,6 +1,7 @@
 from typing import Any, Callable, Type, Optional, Union, List, Tuple, Dict
 
 import can
+import logging
 
 from ...msgs.core.msg_abstract import MessageAbstract
 from ...msgs.core.attritube_base import AttributeBase
@@ -29,10 +30,20 @@ class TableDriven:
     _rx_map: Dict[int, RxSpec]
     _tx_map: Dict[str, TxSpec]
 
-    def __init__(self, fps_manager: FPSManager):
+    def __init__(
+        self,
+        fps_manager: FPSManager,
+        logger_: Optional[logging.Logger] = None,
+    ):
         self._fps_manager = fps_manager
         self._rx_map = {}
         self._tx_map = {}
+        self._logger = logger_
+
+    @property
+    def logger(self) -> Optional[logging.Logger]:
+        """Expose parser logger for downstream components."""
+        return self._logger
 
     # ---------- RX ----------
     def _get_or_create_cached_msg(self, attr_name: str, msg_cls: Type) -> MessageAbstract:
@@ -49,6 +60,13 @@ class TableDriven:
     def parse_packet(self, rx_can_frame: can.Message) -> Optional[MessageAbstract]:
         spec = self._rx_map.get(rx_can_frame.arbitration_id)
         if spec is None:
+            if self._logger is not None:
+                self._logger.debug(
+                    "Ignoring unknown CAN frame id=0x%03X dlc=%d in %s.",
+                    rx_can_frame.arbitration_id,
+                    len(rx_can_frame.data),
+                    type(self).__name__,
+                )
             return None
 
         attr_name, msg_cls, decoder = spec

@@ -1,5 +1,6 @@
 import time
 import threading
+import logging
 from typing import Callable, TypeVar, Optional, Dict
 from ...comms import CommsFactory, create_comm_config
 from .....utiles.fps import FPSManager
@@ -7,10 +8,10 @@ from .....utiles.fps import FPSManager
 
 T = TypeVar('T')
 
-
 class DriverContext:
-    def __init__(self, config: dict):
+    def __init__(self, config: dict, logger_: Optional[logging.Logger] = None):
         self._config = config.copy()
+        self._logger = logger_ if logger_ is not None else logging.getLogger(__name__)
         self.comm = None
 
         self.fps = FPSManager()
@@ -30,6 +31,11 @@ class DriverContext:
         # Stamp dictionary for request throttling (used by _request_and_get).
         # Key is an arbitrary string (e.g. "firmware", "joint_acc:3").
         self._req_stamp: Dict[str, float] = {}
+
+    @property
+    def logger(self) -> logging.Logger:
+        """Expose context logger for downstream components."""
+        return self._logger
 
     def has_comm_error(self) -> bool:
         return self._read_error is not None
@@ -59,7 +65,13 @@ class DriverContext:
 
     def create_comm(self, config: Optional[dict] = None, comm: str = "can"):
         cfg = self._resolve_comm_config(config, comm)
-        self.comm = CommsFactory.create_comm(comm, "impl", config=cfg, comm_type=comm)
+        self.comm = CommsFactory.create_comm(
+            comm,
+            "impl",
+            config=cfg,
+            comm_type=comm,
+            logger_=self.logger.getChild("comm"),
+        )
         if self.comm is None:
             raise RuntimeError(f"Failed to create {comm} communication instance.")
         self.comm.set_callback(self._run_parser_packet_funs)
@@ -78,7 +90,8 @@ class DriverContext:
                 comm_type,
                 "impl",
                 config=comm_cfg[comm_type],
-                comm_type=comm_type
+                comm_type=comm_type,
+                logger_=self.logger.getChild("comm"),
             )
             if comm is None:
                 raise RuntimeError(f"Failed to create {comm_type} communication instance.")
@@ -180,15 +193,25 @@ class DriverContext:
                 # Clear callback to avoid dangling references
                 if hasattr(self.comm, "clear_callback"):
                     self.comm.clear_callback()
-            except Exception:
-                # Ignore callback clear failure, do not block shutdown
-                pass
+            except Exception as exc:
+                # Do not block shutdown, but keep one warning for troubleshooting.
+                self._logger.warning(
+                    "Ignoring comm.clear_callback() failure during shutdown (%s: %s).",
+                    type(exc).__name__,
+                    exc,
+                    exc_info=True,
+                )
 
             try:
                 self.comm.close()
-            except Exception:
-                # Ignore close errors from underlying comm layer
-                pass
+            except Exception as exc:
+                # Do not block shutdown, but keep one warning for troubleshooting.
+                self._logger.warning(
+                    "Ignoring comm.close() failure during shutdown (%s: %s).",
+                    type(exc).__name__,
+                    exc,
+                    exc_info=True,
+                )
 
             self.comm = None
             self._comm_initialized = False
@@ -203,7 +226,12 @@ class DriverContext:
                 self._read_error = exc
                 self._read_stop_event.set()
                 self._monitor_stop_event.set()
-                raise
+                self._logger.error(
+                    "CAN read thread exiting: comm.recv() failed (%s: %s).",
+                    type(exc).__name__,
+                    exc,
+                    exc_info=True,
+                )
 
     def _monitor_loop(self):
         while not self._monitor_stop_event.is_set():

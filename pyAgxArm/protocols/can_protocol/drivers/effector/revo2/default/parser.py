@@ -1,3 +1,4 @@
+import logging
 from typing import TYPE_CHECKING, Callable, Optional, Union, List, Dict, Tuple, Type
 
 from ....core.table_driven import TableDriven
@@ -119,8 +120,12 @@ class Parser(TableDriven, ProtocolParserInterface):
         finger_current_ctrl: Optional[MessageAbstract[FingerCurrentCtrl]]
         finger_pos_time_ctrl: Optional[MessageAbstract[FingerPosTimeCtrl]]
 
-    def __init__(self, fps_manager: FPSManager):
-        super().__init__(fps_manager=fps_manager)
+    def __init__(
+        self,
+        fps_manager: FPSManager,
+        logger_: Optional[logging.Logger] = None,
+    ):
+        super().__init__(fps_manager=fps_manager, logger_=logger_)
         self._codec = Codec()
         self._rx_map = self._build_rx_map()
         self._tx_map = self._build_tx_map()

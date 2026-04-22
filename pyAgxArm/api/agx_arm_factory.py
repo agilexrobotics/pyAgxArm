@@ -2,6 +2,7 @@ import copy
 import hashlib
 import inspect
 import json
+import logging
 import threading
 import time
 import weakref
@@ -25,6 +26,8 @@ from ..protocols.can_protocol.drivers import (
     PiperXDriverV183,
     PiperXDriverV188,
 )
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def extract_kwargs(func, source: dict) -> dict:
@@ -81,10 +84,6 @@ def create_agx_arm_config(
     config = {
         "robot": robot,
         "firmeware_version": firmeware_version,
-        "log": {
-            "level": kwargs.get("log_level", "INFO"),
-            "path": kwargs.get("log_path", ""),
-        },
     }
 
     # ---------- robot-specific options ----------
@@ -312,7 +311,7 @@ class AgxArmFactory:
 
         detect_fn = getattr(can, "detect_available_configs", None)
         if detect_fn is None:
-            print(
+            _LOGGER.warning(
                 "[AgxArmFactory.detect_can_configs] python-can has no "
                 "detect_available_configs; returning empty list."
             )

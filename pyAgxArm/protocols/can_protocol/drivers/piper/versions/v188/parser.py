@@ -1,3 +1,4 @@
+import logging
 from typing import Callable, Dict, Optional, Tuple, Type
 
 from .......utiles.numeric_codec import NumericCodec as nc
@@ -67,8 +68,13 @@ class Codec(DefaultCodec):
 class Parser(DefaultParser):
     """v188+ parser using CodecV188."""
 
-    def __init__(self, fps_manager, codec: Optional[Codec] = None):
-        super().__init__(fps_manager, codec=codec or Codec())
+    def __init__(
+        self,
+        fps_manager,
+        codec: Optional[Codec] = None,
+        logger_: Optional[logging.Logger] = None,
+    ):
+        super().__init__(fps_manager, codec=codec or Codec(), logger_=logger_)
 
     def _build_rx_map(
         self,

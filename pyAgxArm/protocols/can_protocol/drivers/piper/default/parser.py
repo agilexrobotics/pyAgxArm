@@ -1,3 +1,4 @@
+import logging
 from typing import TYPE_CHECKING, Callable, Optional, List, Dict, Tuple, Type
 
 from typing_extensions import Final, Literal
@@ -652,8 +653,13 @@ class Parser(TableDriven, ProtocolParserInterface):
         cpv_response_5: Optional[MessageAbstract[ArmMsgFeedbackCPVResponse5]]
         cpv_response_6: Optional[MessageAbstract[ArmMsgFeedbackCPVResponse6]]
 
-    def __init__(self, fps_manager: FPSManager, codec: Optional[Codec] = None):
-        super().__init__(fps_manager=fps_manager)
+    def __init__(
+        self,
+        fps_manager: FPSManager,
+        codec: Optional[Codec] = None,
+        logger_: Optional[logging.Logger] = None,
+    ):
+        super().__init__(fps_manager=fps_manager, logger_=logger_)
         self._codec = codec or Codec()        
         self._rx_map = self._build_rx_map()
         self._tx_map = self._build_tx_map()

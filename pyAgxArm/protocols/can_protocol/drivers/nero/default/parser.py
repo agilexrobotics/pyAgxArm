@@ -1,3 +1,4 @@
+import logging
 from typing import TYPE_CHECKING, Callable, Optional, List, Dict, Tuple, Type
 
 from ......utiles.fps import FPSManager
@@ -139,9 +140,18 @@ class Parser(PiperParser):
 
         cpv_response_7: Optional[MessageAbstract[ArmMsgFeedbackCPVResponse7]]
 
-    def __init__(self, fps_manager: FPSManager, codec: Optional[Codec] = None):
+    def __init__(
+        self,
+        fps_manager: FPSManager,
+        codec: Optional[Codec] = None,
+        logger_: Optional[logging.Logger] = None,
+    ):
         # Reuse Piper Parser init; only replace codec with Nero version.
-        super().__init__(fps_manager=fps_manager, codec=codec or Codec())
+        super().__init__(
+            fps_manager=fps_manager,
+            codec=codec or Codec(),
+            logger_=logger_,
+        )
         self._codec = codec or Codec()
 
     def _build_rx_map(

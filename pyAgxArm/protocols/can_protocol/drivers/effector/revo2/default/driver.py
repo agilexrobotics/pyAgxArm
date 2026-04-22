@@ -1,3 +1,4 @@
+import logging
 from typing import Optional, TypeVar
 
 from typing_extensions import Literal
@@ -30,12 +31,29 @@ class Driver:
     def __init__(self, config: dict, ctx: DriverContext):
         self._config = config.copy()
         self._ctx = ctx
-        self._parser = Parser(self._ctx.fps)
-        self._effector_ctx = EffectorDriverContext(
-            config,
-            self._ctx,
-            self._parser,
-        )
+        self._logger = self._ctx.logger.getChild("effector.revo2")
+        try:
+            self._parser = Parser(
+                self._ctx.fps,
+                logger_=self._logger.getChild("parser"),
+            )
+            self._effector_ctx = EffectorDriverContext(
+                config,
+                self._ctx,
+                self._parser,
+            )
+        except Exception as exc:
+            self._logger.error(
+                "Failed to initialize revo2 effector driver (%s: %s).",
+                type(exc).__name__,
+                exc,
+                exc_info=True,
+            )
+            raise
+
+    @property
+    def logger(self) -> logging.Logger:
+        return self._logger
 
     # -------------------------
     # Internal send helpers
@@ -46,6 +64,10 @@ class Driver:
             if data is not None:
                 comm = self._ctx.get_comm()
                 if comm is None:
+                    self._logger.warning(
+                        "Failed to send %s: comm is None (driver not connected).",
+                        type(msg).__name__,
+                    )
                     raise RuntimeError(
                         "Robot is not connected (comm is None). "
                         "Call `connect()` before sending effector commands."
@@ -53,6 +75,14 @@ class Driver:
                 try:
                     comm.send(data)
                 except Exception as exc:
+                    self._logger.error(
+                        "Failed to send %s on channel '%s' (%s: %s).",
+                        type(msg).__name__,
+                        comm.get_channel(),
+                        type(exc).__name__,
+                        exc,
+                        exc_info=True,
+                    )
                     raise RuntimeError(
                         f"Failed to send {type(msg).__name__} on channel '{comm.get_channel()}': {exc}"
                     ) from exc

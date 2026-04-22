@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import errno
-import time
+import logging
 
 import can
 from can.message import Message
@@ -12,9 +12,6 @@ from .core.can_comm_base import CanCommBase
 from .can_sys_utils import CanSystemInfoBase, LinuxSocketCanSystemInfo
 
 _SUPPORTED_PLATFORMS = {"Linux", "Windows", "Darwin"}
-
-_CAN_LINK_DOWN_WARN_INTERVAL_S = 1.0
-_CAN_SEND_ENOBUFS_WARN_INTERVAL_S = 1.0
 
 
 def create_can_comm_config(
@@ -44,25 +41,36 @@ class CanComm:
     """
     Platform selector for python-can based communication.
     """
-    def __new__(cls, config: dict, comm_type: str = "can"):
+    def __new__(
+        cls,
+        config: dict,
+        comm_type: str = "can",
+        logger_: Optional[logging.Logger] = None,
+    ):
         platform_system = system()
         if platform_system not in _SUPPORTED_PLATFORMS:
             supported_text = ", ".join(sorted(_SUPPORTED_PLATFORMS))
             raise RuntimeError(
-                f"Unsupported platform: {platform_system}. "
-                f"Supported platforms: {supported_text}."
+                "Unsupported platform: %s. Supported platforms: %s."
+                % (platform_system, supported_text)
             )
-        return CanCommImpl(config, comm_type)
+        return CanCommImpl(config, comm_type, logger_=logger_)
 
 
 class CanCommImpl(CanCommBase):
-    def __init__(self, config: dict, comm_type: str = "can") -> None:
+    def __init__(
+        self,
+        config: dict,
+        comm_type: str = "can",
+        logger_: Optional[logging.Logger] = None,
+    ) -> None:
         super().__init__()
         self.recv_bus = None
         self.send_bus = None
         self.sysinfo: Optional[CanSystemInfoBase] = None
         self._config = config.copy()
         self._type = comm_type
+        self._logger = logger_ if logger_ is not None else logging.getLogger(__name__)
         self._channel = self._config["channel"]
         self._interface = (
             self._config["interface"]
@@ -76,9 +84,7 @@ class CanCommImpl(CanCommBase):
         self._receive_own_messages = self._config.get("receive_own_messages", False)
         self._local_loopback = self._config.get("local_loopback", False)
         self._is_connected = False
-        self._can_link_down_next_warn_at = 0.0
         self._can_link_down_active = False
-        self._can_send_enobufs_next_warn_at = 0.0
         if system() == "Linux" and self._interface == "socketcan":
             self.sysinfo = LinuxSocketCanSystemInfo
         if self._enable_check_can and self.sysinfo is not None:
@@ -86,38 +92,34 @@ class CanCommImpl(CanCommBase):
         if self._auto_connect:
             self.connect()
 
+    @property
+    def logger(self) -> logging.Logger:
+        """Expose comm logger for downstream components."""
+        return self._logger
+
     def __del__(self):
         try:
             self.close()
         except Exception:
             pass
 
-    def _print_log(self, log_type: str, message: str) -> None:
-        ts = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-        ms = int((time.time() % 1) * 1000)
-        print(f"[{ts}.{ms:03d}] [{log_type}] [{self._channel}] {message}")
-
     def _check_can_status(self) -> None:
         if not self.sysinfo.is_exists(self._channel):
-            raise ValueError(f"Device '{self._channel}' does not exist.")
+            raise ValueError("Device '%s' does not exist." % (self._channel,))
         if not self.sysinfo.is_up(self._channel):
+            self._logger.warning("Device '%s' is DOWN.", self._channel)
             self._can_link_down_active = True
-            self._can_link_down_next_warn_at = (
-                time.monotonic() + _CAN_LINK_DOWN_WARN_INTERVAL_S
-            )
-            self._print_log(
-                "WARN",
-                "Device is DOWN.",
-            )
         actual_bitrate = self.sysinfo.get_bitrate(self._channel)
         if (
             self._bitrate is not None
             and actual_bitrate is not None
             and actual_bitrate != self._bitrate
         ):
-            self._print_log(
-                "WARN",
-                f"CAN port {self._channel} bitrate is {actual_bitrate} bps, expected {self._bitrate} bps.",
+            self._logger.warning(
+                "Device '%s' CAN port bitrate is %s bps, expected %s bps.",
+                self._channel,
+                actual_bitrate,
+                self._bitrate,
             )
 
     def _classify_can_error(self, exc: Exception) -> Optional[str]:
@@ -165,43 +167,15 @@ class CanCommImpl(CanCommBase):
                 return "hard_disconnect"
         return None
 
-    def _notify_can_link_down(self) -> None:
-        self._can_link_down_active = True
-        now = time.monotonic()
-        if now < self._can_link_down_next_warn_at:
-            return
-        self._can_link_down_next_warn_at = (
-            now + _CAN_LINK_DOWN_WARN_INTERVAL_S
-        )
-        self._print_log(
-            "WARN",
-            f"Device is DOWN.",
-        )
-
-    def _notify_can_send_enobufs(self) -> None:
-        now = time.monotonic()
-        if now < self._can_send_enobufs_next_warn_at:
-            return
-        self._can_send_enobufs_next_warn_at = (
-            now + _CAN_SEND_ENOBUFS_WARN_INTERVAL_S
-        )
-        self._print_log(
-            "WARN",
-            "Send buffer is FULL.",
-        )
-
     def _check_can_link_up(self) -> None:
         if not self._can_link_down_active:
             return
         if self.sysinfo and not self.sysinfo.is_up(self._channel):
-                self._notify_can_link_down()
+            self._logger.warning("Device '%s' is DOWN.", self._channel)
+            self._can_link_down_active = True
         else:
-            self._print_log(
-                "INFO",
-                "Device is UP.",
-            )
+            self._logger.info("Device '%s' is UP.", self._channel)
             self._can_link_down_active = False
-            self._can_link_down_next_warn_at = 0.0
 
     def connect(self, **kwargs):
         if self.recv_bus is not None and self.send_bus is not None:
@@ -223,15 +197,13 @@ class CanCommImpl(CanCommBase):
                 pass
             else:
                 self._can_link_down_active = False
-                self._can_link_down_next_warn_at = 0.0
             self._is_connected = True
         except:
             self.close()
             raise can.CanInitializationError(
-                f"Failed to open CAN bus "
-                f"(interface='{self._interface}', "
-                f"channel='{self._channel}', "
-                f"bitrate={self._bitrate})."
+                "Failed to open CAN bus "
+                "(interface='%s', channel='%s', bitrate=%s)."
+                % (self._interface, self._channel, self._bitrate)
             )
 
     def close(self):
@@ -262,13 +234,14 @@ class CanCommImpl(CanCommBase):
             if err_kind == "hard_disconnect":
                 self.close()
                 raise RuntimeError(
-                    f"Device '{self._channel}' is disconnected."
+                    "Device '%s' is disconnected." % (self._channel,)
                 ) from None
             if err_kind == "no_buffer":
-                self._notify_can_send_enobufs()
+                self._logger.warning("Device '%s' send buffer is FULL.", self._channel)
                 return
             if err_kind == "link_down":
-                self._notify_can_link_down()
+                self._logger.warning("Device '%s' is DOWN.", self._channel)
+                self._can_link_down_active = True
                 return
             raise
 
@@ -289,9 +262,10 @@ class CanCommImpl(CanCommBase):
             if err_kind == "hard_disconnect":
                 self.close()
                 raise RuntimeError(
-                    f"Device '{self._channel}' is disconnected."
+                    "Device '%s' is disconnected." % (self._channel,)
                 ) from None
             if err_kind == "link_down":
-                self._notify_can_link_down()
+                self._logger.warning("Device '%s' is DOWN.", self._channel)
+                self._can_link_down_active = True
                 return
             raise
