@@ -1,20 +1,13 @@
 # Nero API Documentation
 
-> This document describes the `pyAgxArm` API for Nero robotic arms (7-DOF), covering initialization, status/data reading, motion control, and advanced settings.
+> This document describes the `pyAgxArm` model-specific CAN APIs for Nero robotic arms (7-DOF), focusing on runtime data read/write, motion control, and protocol parameters.
 
 ## Table of Contents
 
 - [Switch to 中文](#nero-机械臂-api-使用文档)
-- [Import Module](#import-module)
 - [Firmware Version](#firmware-version)
-- [Create Instance and Connect](#create-instance-and-connect)
-  - [Create Configuration — create_agx_arm_config()](#create-configuration--create_agx_arm_config)
-  - [Create Arm Driver Instance — AgxArmFactory.create_arm()](#create-arm-driver-instance--agxarmfaborycreate_arm)
-  - [Connect — connect()](#connect--connect)
-  - [Disconnect — disconnect()](#disconnect--disconnect)
-  - [Initialize End Effector — init_effector()](#initialize-end-effector--init_effector)
-- [General Status](#general-status)
-  - [Get Joint Count — joint_nums](#get-joint-count--joint_nums)
+  - [Version List](#version-list)
+  - [How to Choose](#how-to-choose)
 - [Data Reading](#data-reading)
   - [MessageAbstract Return Value Overview](#messageabstract-return-value-overview)
   - [Get Arm Status — get_arm_status()](#get-arm-status--get_arm_status)
@@ -28,16 +21,6 @@
 - [Parameter Settings](#parameter-settings)
   - [Set Speed Percent — set_speed_percent()](#set-speed-percent--set_speed_percent)
   - [Set Motion Mode — set_motion_mode()](#set-motion-mode--set_motion_mode)
-- [TCP Related](#tcp-related)
-  - [Set TCP Offset — set_tcp_offset()](#set-tcp-offset--set_tcp_offset)
-  - [Get TCP Pose — get_tcp_pose()](#get-tcp-pose--get_tcp_pose)
-  - [Flange Pose to TCP Pose — get_flange2tcp_pose()](#flange-pose-to-tcp-pose--get_flange2tcp_pose)
-  - [TCP Pose to Flange Pose — get_tcp2flange_pose()](#tcp-pose-to-flange-pose--get_tcp2flange_pose)
-- [Kinematics Related](#kinematics-related)
-  - [Forward Kinematics — fk()](#forward-kinematics--fk)
-- [SDK Config Related](#sdk-config-related)
-  - [Set Auto Motion Mode Switching — set_auto_set_motion_mode_enabled()](#set-auto-motion-mode-switching--set_auto_set_motion_mode_enabled)
-  - [Set Joint Limits Enabled — set_joint_limits_enabled()](#set-joint-limits-enabled--set_joint_limits_enabled)
 - [Leader-Follower Arm](#leader-follower-arm)
   - [Set Normal Mode — set_normal_mode()](#set-normal-mode--set_normal_mode)
   - [Set Leader Mode — set_leader_mode()](#set-leader-mode--set_leader_mode)
@@ -54,14 +37,10 @@
   - [Linear Motion — move_l()](#linear-motion--move_l)
   - [Arc Motion — move_c()](#arc-motion--move_c)
   - [Single Joint MIT Control — move_mit()](#single-joint-mit-control--move_mit)
-
----
-
-## Import Module
-
-```python
-from pyAgxArm import create_agx_arm_config, AgxArmFactory, ArmModel, NeroFW
-```
+- [CPV Motion and Parameters](#cpv-motion-and-parameters)
+  - [CPV Command APIs](#cpv-command-apis)
+  - [CPV Parameter Read APIs](#cpv-parameter-read-apis)
+  - [CPV Parameter Write APIs](#cpv-parameter-write-apis)
 
 ---
 
@@ -102,270 +81,6 @@ Raw strings are also accepted (backward-compatible):
 
 ```python
 cfg = create_agx_arm_config(robot="nero", firmeware_version="default", channel="can0")
-```
-
----
-
-## Create Instance and Connect
-
-### Create Configuration — `create_agx_arm_config()`
-
-**Description:** Generate the configuration dictionary required by the robotic arm for subsequent Driver instance creation.
-
-**Function Definition:**
-
-```python
-create_agx_arm_config(
-    robot: Literal["nero", "piper", "piper_h", "piper_l", "piper_x"],
-    comm: Literal["can"] = "can",
-    firmeware_version: str = "default",
-    **kwargs,
-) -> dict
-```
-
-**Parameters:**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `robot` | `str` | Robotic arm model. Use `ArmModel` constants: `ArmModel.NERO` / `ArmModel.PIPER` / `ArmModel.PIPER_H` / `ArmModel.PIPER_L` / `ArmModel.PIPER_X` (raw strings also accepted) |
-| `comm` | `str` | Communication type. Options: `"can"` (default). Note: `comm` is not the CAN channel name; the CAN channel is specified by `channel` |
-| `firmeware_version` | `str` | Main controller firmware version. Use per-robot constants: Nero series → `NeroFW.DEFAULT` / `NeroFW.V111`. See [Firmware Version](#firmware-version). Default `"default"` |
-
-**Optional Keyword Arguments (`**kwargs`):**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `joint_limits` | `dict` | Custom joint limits (unit: rad). Defaults are assigned automatically; manually entered limits are not currently applied to actual control. See example below |
-| `auto_set_motion_mode` | `bool` | Whether the SDK should automatically switch the arm into the required motion mode before motion APIs are sent. Default `True`. Set to `False` if you want to manage motion mode switching explicitly in your own application logic. |
-| `enable_joint_limits` | `bool` | Whether to enable software joint-limit clamping in runtime motion APIs. Default `True`. Set to `False` to skip model `joint_limits` clamp (basic numeric range checks still apply). |
-| `channel` | `str` | CAN channel identifier. Default `"can0"`. The documented and verified combinations are: with `"agx_cando"` use device index strings such as `"0"`, `"1"`, `"2"`; with `"socketcan"` use Linux CAN netdev names such as `"can0"` or your renamed interface; with `"slcan"` use serial device paths such as `"/dev/ttyACM0"` on macOS (`Darwin`). |
-| `interface` | `str` | CAN interface type, default `"socketcan"`. The documented and verified values are `"socketcan"` on Linux, `"agx_cando"` on Windows with the Agilex CANDO backend, and `"slcan"` on macOS (`Darwin`). |
-| `bitrate` | `int` | CAN baud rate, default `1000000` (1 Mbps) |
-| `enable_check_can` | `bool` | Whether to check the CAN module when creating the Comm instance, default `True`. This pre-check is currently only effective for Linux `socketcan`; for other backends (for example, Windows `agx_cando` and macOS `slcan`) the actual availability check happens when the CAN bus is opened. |
-| `auto_connect` | `bool` | Whether to automatically create the CAN Bus instance, default `True` |
-| `timeout` | `float` | CAN Bus read/write timeout (seconds), default `0.001` |
-| `receive_own_messages` | `bool` | Whether the local CAN backend should receive frames sent by the same process/device. Default `False`. This is useful for debugging, loopback tests, or virtual/single-node verification, but is usually not recommended for normal arm control. Backend support depends on the selected `interface`. The `slcan` backend on macOS generally does not support this; **do not pass** it when using `interface="slcan"`. |
-| `local_loopback` | `bool` | Whether to enable CAN **local loopback**. Default is `False` (loopback disabled), so your local terminal/process will **not** receive the CAN frames it sends itself. You may enable it for debugging, but it is **not recommended** for normal SDK usage because it may consume bus receive resources and impact reading performance. The `slcan` backend on macOS generally does not support this; **do not pass** it when using `interface="slcan"`. |
-
-**Return Value:** `dict`
-
-Example return structure:
-
-```json
-{
-    "robot": "nero",
-    "firmeware_version": "default",
-    "joint_names": ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6", "joint7"],
-    "joint_limits": {
-        "joint1": [-2.705261, 2.705261],
-        "joint2": [-1.745330, 1.745330],
-        "joint3": [-2.757621, 2.757621],
-        "joint4": [-1.012291, 2.146755],
-        "joint5": [-2.757621, 2.757621],
-        "joint6": [-0.733039, 0.959932],
-        "joint7": [-1.570797, 1.570797]
-    },
-    "comm": {
-        "type": "can",
-        "can": {
-            "channel": "can0",
-            "interface": "socketcan",
-            "bitrate": 1000000,
-            "enable_check_can": true,
-            "auto_connect": true,
-            "timeout": 0.001,
-            "receive_own_messages": false,
-            "local_loopback": false
-        }
-    }
-}
-```
-
-> **Note:** `auto_set_motion_mode` is added to the top-level config only when you pass it explicitly.
-
-Verified interface/channel examples:
-
-- Linux `socketcan`: `create_agx_arm_config(..., interface="socketcan", channel="can0")`
-- Windows `agx_cando`: `create_agx_arm_config(..., interface="agx_cando", channel="0")`
-- macOS `slcan`: `create_agx_arm_config(..., interface="slcan", channel="/dev/ttyACM0")`
-
-On Windows, `interface="agx_cando"` requires the separately installed `python-can-agx-cando` plugin. Install it from `https://github.com/agilexrobotics/python-can-agx-cando.git`, then run `pip3 install .` in that repository before using `pyAgxArm`.
-On macOS (`Darwin`), when using `interface="slcan"` with the default channel, grant serial permission first.
-
-**Usage Example:**
-
-```python
-from pyAgxArm import create_agx_arm_config, ArmModel, NeroFW
-
-cfg = create_agx_arm_config(robot=ArmModel.NERO, firmeware_version=NeroFW.DEFAULT, channel="can0")
-print(cfg)
-```
-
----
-
-### Create Arm Driver Instance — `AgxArmFactory.create_arm()`
-
-**Description:** Create the corresponding robotic arm Driver instance via factory method based on the configuration dictionary.
-
-**Function Definition:**
-
-```python
-create_arm(cls, config: dict, **kwargs) -> T
-```
-
-**Parameters:**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `config` | `dict` | Configuration dictionary generated by `create_agx_arm_config()` |
-
-**Return Value:** `Driver` — Different arm models, communication methods, and firmware versions correspond to different instances.
-
-**Usage Example:**
-
-```python
-from pyAgxArm import create_agx_arm_config, AgxArmFactory, ArmModel, NeroFW
-
-cfg = create_agx_arm_config(robot=ArmModel.NERO, firmeware_version=NeroFW.DEFAULT, channel="can0")
-robot = AgxArmFactory.create_arm(cfg)
-```
-
----
-
-### Connect — `connect()`
-
-**Description:** Establish the connection and start the data reading thread.
-
-**Function Definition:**
-
-```python
-connect(self, start_read_thread: bool = True) -> None
-```
-
-**Parameters:**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `start_read_thread` | `bool` | Whether to start the data reading thread, default `True` |
-
-**Usage Example:**
-
-```python
-from pyAgxArm import create_agx_arm_config, AgxArmFactory, ArmModel, NeroFW
-
-cfg = create_agx_arm_config(robot=ArmModel.NERO, firmeware_version=NeroFW.DEFAULT, channel="can0")
-robot = AgxArmFactory.create_arm(cfg)
-robot.connect()
-```
-
----
-
-### Disconnect — `disconnect()`
-
-**Description:** Disconnect from the arm and release underlying threads and CAN resources.
-
-This method is **idempotent** and can be safely called when the arm instance is no longer needed, e.g. after reading firmware version and before creating a new instance.
-
-> **Note:** After `disconnect()`, the internal communication handle may be released. Calling `robot.is_connected()` will return `False`.
-
-**Function Definition:**
-
-```python
-disconnect(self, join_timeout: float = 1.0) -> None
-```
-
-**Parameters:**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `join_timeout` | `float` | Timeout (seconds) for joining background threads during shutdown, default `1.0` |
-
-**Usage Example:**
-
-```python
-from pyAgxArm import create_agx_arm_config, AgxArmFactory, ArmModel, NeroFW
-
-cfg = create_agx_arm_config(robot=ArmModel.NERO, firmeware_version=NeroFW.DEFAULT, channel="can0")
-robot = AgxArmFactory.create_arm(cfg)
-robot.connect()
-print(robot.is_connected())
-
-robot.disconnect()
-print(robot.is_connected())
-```
-
----
-
-### Initialize End Effector — `init_effector()`
-
-**Description:** Initialize the end effector Driver and return the corresponding effector instance (e.g., gripper / dexterous hand, etc.).
-
-> **Note:** A single `robot` instance can only initialize an end effector **once**. To switch to a different effector type, create a new robotic arm instance.
-
-**Function Definition:**
-
-```python
-init_effector(self, effector: str) -> EffectorDriver
-```
-
-**Parameters:**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `effector` | `str` | Effector type (it is recommended to use `robot.OPTIONS.EFFECTOR.xxx` constants) |
-
-**Return Value:** `EffectorDriver`
-
-**Usage Example:**
-
-```python
-from pyAgxArm import create_agx_arm_config, AgxArmFactory, ArmModel, NeroFW
-
-cfg = create_agx_arm_config(robot=ArmModel.NERO, firmeware_version=NeroFW.DEFAULT, channel="can0")
-robot = AgxArmFactory.create_arm(cfg)
-robot.connect()
-
-end_effector = robot.init_effector(robot.OPTIONS.EFFECTOR.REVO2)
-```
-
----
-
-## General Status
-
-### Get Joint Count — `joint_nums`
-
-**Description:** Get the number of joints of the robotic arm (e.g., 7 for Nero).
-
-**Attribute Definition:**
-
-```python
-joint_nums: int
-```
-
-**Return Value:** `int`
-
-**Usage Example:**
-
-```python
-import time
-from pyAgxArm import create_agx_arm_config, AgxArmFactory, ArmModel, NeroFW
-
-cfg = create_agx_arm_config(robot=ArmModel.NERO, firmeware_version=NeroFW.DEFAULT, channel="can0")
-robot = AgxArmFactory.create_arm(cfg)
-robot.connect()
-
-print("robotic arm joint_nums =", robot.joint_nums)
-
-for joint_index in range(1, robot.joint_nums + 1):
-    start_t = time.monotonic()
-    while True:
-        if robot.enable(joint_index):
-            print(f"enable joint {joint_index} success")
-            break
-        if time.monotonic() - start_t > 5.0:
-            print(f"enable joint {joint_index} timeout (5s)")
-            break
-        time.sleep(0.01)
 ```
 
 ---
@@ -572,7 +287,10 @@ while True:
 **Function Definition:**
 
 ```python
-get_motor_states(self, joint_index: Literal[1, 2, 3, 4, 5, 6, 7]) -> MessageAbstract[ArmMsgFeedbackHighSpd] | None
+get_motor_states(
+    self,
+    joint_index: Literal[1, 2, 3, 4, 5, 6, 7],
+) -> MessageAbstract[ArmMsgFeedbackHighSpd] | None
 ```
 
 **Parameters:**
@@ -616,7 +334,10 @@ if ms is not None:
 **Function Definition:**
 
 ```python
-get_driver_states(self, joint_index: Literal[1, 2, 3, 4, 5, 6, 7]) -> MessageAbstract[ArmMsgFeedbackLowSpd] | None
+get_driver_states(
+    self,
+    joint_index: Literal[1, 2, 3, 4, 5, 6, 7],
+) -> MessageAbstract[ArmMsgFeedbackLowSpd] | None
 ```
 
 **Parameters:**
@@ -662,7 +383,10 @@ if ds is not None:
 **Function Definition:**
 
 ```python
-get_joint_enable_status(self, joint_index: Literal[1, 2, 3, 4, 5, 6, 7, 255]) -> bool
+get_joint_enable_status(
+    self,
+    joint_index: Literal[1, 2, 3, 4, 5, 6, 7, 255],
+) -> bool
 ```
 
 **Parameters:**
@@ -721,7 +445,11 @@ print(robot.get_joints_enable_status_list())
 **Function Definition:**
 
 ```python
-get_firmware(self, timeout: float = 1.0, min_interval: float = 1.0) -> dict | None
+get_firmware(
+    self,
+    timeout: float = 1.0,
+    min_interval: float = 1.0,
+) -> dict | None
 ```
 
 **Parameters:**
@@ -801,7 +529,10 @@ robot.set_speed_percent(100)
 **Function Definition:**
 
 ```python
-set_motion_mode(self, motion_mode: Literal["p", "j", "l", "c", "mit", "js"] = "p") -> None
+set_motion_mode(
+    self,
+    motion_mode: Literal["p", "j", "l", "c", "mit", "js"] = "p",
+) -> None
 ```
 
 **Parameters:**
@@ -820,286 +551,6 @@ robot = AgxArmFactory.create_arm(cfg)
 robot.connect()
 
 robot.set_motion_mode(robot.OPTIONS.MOTION_MODE.P)
-```
-
----
-
-## TCP Related
-
-### Set TCP Offset — `set_tcp_offset()`
-
-**Description:** Set the TCP (Tool Center Point) offset pose relative to the flange (in the **flange coordinate frame**). Default is no offset: `[0, 0, 0, 0, 0, 0]`.
-
-> **Tip:** This offset value is only saved within the SDK/Driver instance and is not sent to the controller.
-
-**Function Definition:**
-
-```python
-set_tcp_offset(self, pose: list[float]) -> None
-```
-
-**Parameters:**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `pose` | `list[float]` | TCP pose offset in the flange coordinate frame `[x, y, z, roll, pitch, yaw]`: `x, y, z` are position (m); `roll, pitch, yaw` are Euler angles (rad). Range: `roll/yaw` ∈ `[-π, π]`, `pitch` ∈ `[-π/2, π/2]` |
-
-**Usage Example:**
-
-```python
-from pyAgxArm import create_agx_arm_config, AgxArmFactory, ArmModel, NeroFW
-
-cfg = create_agx_arm_config(robot=ArmModel.NERO, firmeware_version=NeroFW.DEFAULT, channel="can0")
-robot = AgxArmFactory.create_arm(cfg)
-robot.connect()
-
-robot.set_tcp_offset([0.0, 0.0, 0.10, 0.0, 0.0, 0.0])
-```
-
----
-
-### Get TCP Pose — `get_tcp_pose()`
-
-**Description:** Get the TCP pose. This interface first reads the flange pose, then performs a rigid body transformation based on the offset saved by `set_tcp_offset()` to obtain the TCP pose. If no offset has been set, the TCP pose is the same as the flange pose.
-
-**Function Definition:**
-
-```python
-get_tcp_pose(self) -> MessageAbstract[list[float]] | None
-```
-
-**Return Value:** `MessageAbstract[list[float]] | None`
-
-`.msg` is a `list[float]` of length 6: `[x, y, z, roll, pitch, yaw]` (m / rad).
-
-**Usage Example:**
-
-```python
-import time
-from pyAgxArm import create_agx_arm_config, AgxArmFactory, ArmModel, NeroFW
-
-cfg = create_agx_arm_config(robot=ArmModel.NERO, firmeware_version=NeroFW.DEFAULT, channel="can0")
-robot = AgxArmFactory.create_arm(cfg)
-robot.connect()
-
-robot.set_tcp_offset([0.0, 0.0, 0.10, 0.0, 0.0, 0.0])
-
-while True:
-    tcp = robot.get_tcp_pose()
-    if tcp is not None:
-        print(tcp.msg)
-        print(tcp.hz, tcp.timestamp)
-    time.sleep(0.02)
-```
-
----
-
-### Flange Pose to TCP Pose — `get_flange2tcp_pose()`
-
-**Description:** Given a flange pose (in the base/world coordinate frame), compute the corresponding TCP pose based on the offset saved by `set_tcp_offset()`.
-
-**Function Definition:**
-
-```python
-get_flange2tcp_pose(self, flange_pose: list[float]) -> list[float]
-```
-
-**Parameters:**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `flange_pose` | `list[float]` | Flange pose `[x, y, z, roll, pitch, yaw]` (m / rad). Range: `roll/yaw` ∈ `[-π, π]`, `pitch` ∈ `[-π/2, π/2]` |
-
-**Return Value:** `list[float]` — TCP pose `[x, y, z, roll, pitch, yaw]` (m / rad).
-
-**Usage Example:**
-
-```python
-from pyAgxArm import create_agx_arm_config, AgxArmFactory, ArmModel, NeroFW
-
-cfg = create_agx_arm_config(robot=ArmModel.NERO, firmeware_version=NeroFW.DEFAULT, channel="can0")
-robot = AgxArmFactory.create_arm(cfg)
-robot.connect()
-
-robot.set_tcp_offset([0.0, 0.0, 0.10, 0.0, 0.0, 0.0])
-
-# Directly specify a flange pose
-tcp_pose = robot.get_flange2tcp_pose([-0.45, -0.0, 0.45, -1.5708, 0.0, -3.14159])
-print("tcp_pose =", tcp_pose)
-
-# Obtain from current pose; result is the same as get_tcp_pose()
-flange_pose = robot.get_flange_pose()
-if flange_pose is not None:
-    tcp_pose = robot.get_flange2tcp_pose(flange_pose)
-    print("tcp_pose =", tcp_pose)
-```
-
----
-
-### TCP Pose to Flange Pose — `get_tcp2flange_pose()`
-
-**Description:** Given a target TCP pose (in the base/world coordinate frame), compute the corresponding target flange pose based on the offset saved by `set_tcp_offset()`. Pass the returned flange pose to `move_p()` to **move the TCP to the target TCP pose**.
-
-**Function Definition:**
-
-```python
-get_tcp2flange_pose(self, tcp_pose: list[float]) -> list[float]
-```
-
-**Parameters:**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `tcp_pose` | `list[float]` | Target TCP pose `[x, y, z, roll, pitch, yaw]` (m / rad). Range: `roll/yaw` ∈ `[-π, π]`, `pitch` ∈ `[-π/2, π/2]` |
-
-**Return Value:** `list[float]` — Target flange pose `[x, y, z, roll, pitch, yaw]` (m / rad), which can be directly used with `move_p()`.
-
-**Usage Example:**
-
-```python
-from pyAgxArm import create_agx_arm_config, AgxArmFactory, ArmModel, NeroFW
-
-cfg = create_agx_arm_config(robot=ArmModel.NERO, firmeware_version=NeroFW.DEFAULT, channel="can0")
-robot = AgxArmFactory.create_arm(cfg)
-robot.connect()
-
-robot.set_tcp_offset([0.0, 0.0, 0.10, 0.0, 0.0, 0.0])
-
-target_tcp_pose = [-0.45, -0.0, 0.45, -1.5708, 0.0, -3.14159]
-target_flange_pose = robot.get_tcp2flange_pose(target_tcp_pose)
-print("target_flange_pose =", target_flange_pose)
-
-# robot.move_p(target_flange_pose)  # Note: this will trigger motion
-```
-
----
-
-## Kinematics Related
-
-### Forward Kinematics — `fk()`
-
-**Description:** Compute the end **flange pose** from a given set of joint angles using the robot's built-in modified DH model.
-
-This is an **offline** computation (no CAN I/O). The output pose format matches `.msg` from [get_flange_pose()](#get-flange-pose--get_flange_pose):  
-`[x, y, z, roll, pitch, yaw]` in the **base frame**, where `x/y/z` are meters and `roll/pitch/yaw` are radians (ZYX RPY convention used by the SDK).
-
-> **Note:** Nero has 7 DOF. The `fk()` input is a 7-element joint list.
-
-**Function Definition:**
-
-```python
-fk(self, joint_angles: list[float]) -> list[float]
-```
-
-**Parameters:**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `joint_angles` | `list[float]` | Joint angles in **rad**, length 7: `[j1, j2, j3, j4, j5, j6, j7]` |
-
-**Return Value:** `list[float]`
-
-`[x, y, z, roll, pitch, yaw]` — flange pose in base frame.
-
-**Usage Examples:**
-
-1) Combine with [get_joint_angles()](#get-joint-angles--get_joint_angles) (current arm state → FK):
-
-```python
-ja = robot.get_joint_angles()
-if ja is not None:
-    flange_pose = robot.fk(ja.msg)
-    print("fk flange:", flange_pose)
-```
-
-2) Combine with [get_leader_joint_angles()](#get-leader-joint-angles--get_leader_joint_angles) (leader angles → FK):
-
-```python
-mja = robot.get_leader_joint_angles()
-if mja is not None:
-    leader_flange_pose = robot.fk(mja.msg)
-    print("leader fk flange:", leader_flange_pose)
-```
-
-3) Combine with [get_flange2tcp_pose()](#flange-pose-to-tcp-pose--get_flange2tcp_pose) (FK flange → derived TCP):
-
-```python
-ja = robot.get_joint_angles()
-if ja is not None:
-    flange_pose = robot.fk(ja.msg)
-    tcp_pose = robot.get_flange2tcp_pose(flange_pose)
-    print("fk tcp:", tcp_pose)
-```
-
-4) Compare measured flange pose vs FK result (for quick consistency checks):
-
-```python
-ja = robot.get_joint_angles()
-fp = robot.get_flange_pose()
-if ja is not None and fp is not None:
-    fk_fp = robot.fk(ja.msg)
-    print("measured flange:", fp.msg)
-    print("fk flange:", fk_fp)
-```
-
----
-
-## SDK Config Related
-
-### Set Auto Motion Mode Switching — `set_auto_set_motion_mode_enabled()`
-
-**Description:** Enable or disable automatic `set_motion_mode()` switching when calling `move_*` APIs at runtime.
-
-- `True`: keep auto-switching behavior (default).
-- `False`: do not auto switch; you need to call `set_motion_mode()` manually when needed.
-
-**Function Definition:**
-
-```python
-set_auto_set_motion_mode_enabled(self, enabled: bool) -> None
-```
-
-**Parameters:**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `enabled` | `bool` | Whether to enable automatic motion-mode switching |
-
-**Usage Example:**
-
-```python
-robot.set_auto_set_motion_mode_enabled(False)
-robot.set_motion_mode(robot.OPTIONS.MOTION_MODE.J)
-robot.move_j([0.0] * robot.joint_nums)
-```
-
----
-
-### Set Joint Limits Enabled — `set_joint_limits_enabled()`
-
-**Description:** Enable or disable software joint limits at runtime.
-
-- `True`: joint commands are clamped by configured `joint_limits` / model limits.
-- `False`: skip model `joint_limits` clamp and only keep basic numeric range protection.
-
-**Function Definition:**
-
-```python
-set_joint_limits_enabled(self, enabled: bool) -> None
-```
-
-**Parameters:**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| `enabled` | `bool` | Whether to enable software joint limits |
-
-**Usage Example:**
-
-```python
-robot.set_joint_limits_enabled(False)
-robot.move_j([0.0] * robot.joint_nums)
-robot.set_joint_limits_enabled(True)
 ```
 
 ---
@@ -1235,7 +686,10 @@ while True:
 **Function Definition:**
 
 ```python
-enable(self, joint_index: Literal[1, 2, 3, 4, 5, 6, 7, 255] = 255) -> bool
+enable(
+    self,
+    joint_index: Literal[1, 2, 3, 4, 5, 6, 7, 255] = 255,
+) -> bool
 ```
 
 **Parameters:**
@@ -1273,7 +727,10 @@ while not robot.enable():
 **Function Definition:**
 
 ```python
-disable(self, joint_index: Literal[1, 2, 3, 4, 5, 6, 7, 255] = 255) -> bool
+disable(
+    self,
+    joint_index: Literal[1, 2, 3, 4, 5, 6, 7, 255] = 255,
+) -> bool
 ```
 
 **Parameters:**
@@ -1552,7 +1009,12 @@ while True:
 **Function Definition:**
 
 ```python
-move_c(self, start_pose: list[float], mid_pose: list[float], end_pose: list[float]) -> None
+move_c(
+    self,
+    start_pose: list[float],
+    mid_pose: list[float],
+    end_pose: list[float],
+) -> None
 ```
 
 **Parameters:**
@@ -1681,23 +1143,67 @@ for i in range(1, robot.joint_nums + 1):
 
 ---
 
+## CPV Motion and Parameters
+
+CPV mode provides direct joint **position / velocity command** and parameter read/write APIs.  
+Calling CPV APIs will internally switch to CPV motion mode when needed (`set_motion_mode(MOVE_CPV)`).
+
+### CPV Command APIs
+
+| API | Signature | Description |
+| --- | --- | --- |
+| `move_cpv_pos` | `move_cpv_pos(self, joint_index: Literal[1, 2, 3, 4, 5, 6, 7], pos: float) -> None` | Send CPV position command (rad). If outside joint limit, SDK clamps and logs warning. |
+| `move_cpv_vel` | `move_cpv_vel(self, joint_index: Literal[1, 2, 3, 4, 5, 6, 7], vel: float) -> None` | Send CPV velocity command (rad/s). |
+
+### CPV Parameter Read APIs
+
+All read APIs support `timeout` and `min_interval`, and return `float | None`.
+
+| API | Unit / Meaning |
+| --- | --- |
+| `get_cpv_pos(joint_index, timeout=1.0, min_interval=1.0)` | Joint position (rad) |
+| `get_cpv_vel(joint_index, timeout=1.0, min_interval=1.0)` | Joint velocity (rad/s) |
+| `get_cpv_acc(joint_index, timeout=1.0, min_interval=1.0)` | Acceleration (rad/s^2) |
+| `get_cpv_dcc(joint_index, timeout=1.0, min_interval=1.0)` | Deceleration (rad/s^2) |
+| `get_cpv_cv(joint_index, timeout=1.0, min_interval=1.0)` | Contour/profile velocity (rad/s) |
+| `get_cpv_pp(joint_index, timeout=1.0, min_interval=1.0)` | Position-loop proportional gain |
+| `get_cpv_kp(joint_index, timeout=1.0, min_interval=1.0)` | Velocity-loop proportional gain |
+| `get_cpv_ki(joint_index, timeout=1.0, min_interval=1.0)` | Velocity-loop integral gain |
+
+### CPV Parameter Write APIs
+
+Write APIs are **ACK + read-back verified** and return `bool`.
+
+| API | Description |
+| --- | --- |
+| `set_cpv_acc(joint_index, acc, timeout=1.0)` | Set CPV acceleration parameter |
+| `set_cpv_dcc(joint_index, dcc, timeout=1.0)` | Set CPV deceleration parameter |
+| `set_cpv_cv(joint_index, cv, timeout=1.0)` | Set CPV contour/profile velocity parameter |
+| `set_cpv_pp(joint_index, pp, timeout=1.0)` | Set CPV position-loop proportional gain |
+| `set_cpv_kp(joint_index, kp, timeout=1.0)` | Set CPV velocity-loop proportional gain |
+| `set_cpv_ki(joint_index, ki, timeout=1.0)` | Set CPV velocity-loop integral gain |
+
+**Quick Example:**
+
+```python
+ok = robot.set_cpv_acc(joint_index=1, acc=2.0)
+print("set_cpv_acc:", ok)
+print("cpv_acc =", robot.get_cpv_acc(joint_index=1))
+robot.move_cpv_vel(joint_index=1, vel=0.2)
+```
+
+---
+
 # Nero 机械臂 API 使用文档
 
-> 本文档描述 `pyAgxArm` SDK 为 Nero 系列机械臂（7-DOF）提供的 Python API。涵盖实例创建、状态读取、运动控制、参数配置等全部接口。
+> 本文档描述 `pyAgxArm` SDK 中 Nero 机型相关的 CAN 收发 API，聚焦运行时数据读写、运动控制与协议参数能力。
 
 ## 目录
 
 - [切换到 English](#nero-api-documentation)
-- [导入模块](#导入模块)
 - [固件版本选择](#固件版本选择)
-- [创建实例并连接](#创建实例并连接)
-  - [创建配置参数 — create_agx_arm_config()](#创建配置参数--create_agx_arm_config)
-  - [创建机械臂 Driver 实例 — AgxArmFactory.create_arm()](#创建机械臂-driver-实例--agxarmfactorycreate_arm)
-  - [创建连接 — connect()](#创建连接--connect)
-  - [断开连接 — disconnect()](#断开连接--disconnect)
-  - [初始化末端执行器 — init_effector()](#初始化末端执行器--init_effector)
-- [通用状态](#通用状态)
-  - [获取关节数量 — joint_nums](#获取关节数量--joint_nums)
+  - [版本列表](#版本列表)
+  - [如何选择](#如何选择)
 - [数据读取](#数据读取)
   - [MessageAbstract 返回值通用说明](#messageabstract-返回值通用说明)
   - [读取机械臂状态 — get_arm_status()](#读取机械臂状态--get_arm_status)
@@ -1711,16 +1217,6 @@ for i in range(1, robot.joint_nums + 1):
 - [参数设定](#参数设定)
   - [设定运行速度 — set_speed_percent()](#设定运行速度--set_speed_percent)
   - [设定运动模式 — set_motion_mode()](#设定运动模式--set_motion_mode)
-- [TCP 相关](#tcp-相关)
-  - [设置 TCP 偏移 — set_tcp_offset()](#设置-tcp-偏移--set_tcp_offset)
-  - [获取 TCP 位姿 — get_tcp_pose()](#获取-tcp-位姿--get_tcp_pose)
-  - [法兰位姿转 TCP 位姿 — get_flange2tcp_pose()](#法兰位姿转-tcp-位姿--get_flange2tcp_pose)
-  - [TCP 位姿转法兰位姿 — get_tcp2flange_pose()](#tcp-位姿转法兰位姿--get_tcp2flange_pose)
-- [运动学相关](#运动学相关)
-  - [正运动学 — fk()](#正运动学--fk)
-- [SDK 配置相关](#sdk-配置相关)
-  - [设置自动切换运动模式开关 — set_auto_set_motion_mode_enabled()](#设置自动切换运动模式开关--set_auto_set_motion_mode_enabled)
-  - [设置关节软件限位开关 — set_joint_limits_enabled()](#设置关节软件限位开关--set_joint_limits_enabled)
 - [Leader-Follower 臂](#leader-follower-臂)
   - [设定正常模式 — set_normal_mode()](#设定正常模式--set_normal_mode)
   - [设定主导臂（Leader）模式 — set_leader_mode()](#设定主导臂leader模式--set_leader_mode)
@@ -1737,14 +1233,10 @@ for i in range(1, robot.joint_nums + 1):
   - [直线运动 — move_l()](#直线运动--move_l)
   - [圆弧运动 — move_c()](#圆弧运动--move_c)
   - [单关节 MIT 控制 — move_mit()](#单关节-mit-控制--move_mit)
-
----
-
-## 导入模块
-
-```python
-from pyAgxArm import create_agx_arm_config, AgxArmFactory, ArmModel, NeroFW
-```
+- [CPV 运动与参数](#cpv-运动与参数)
+  - [CPV 指令接口](#cpv-指令接口)
+  - [CPV 参数读取接口](#cpv-参数读取接口)
+  - [CPV 参数写入接口](#cpv-参数写入接口)
 
 ---
 
@@ -1785,268 +1277,6 @@ robot.connect()
 
 ```python
 cfg = create_agx_arm_config(robot="nero", firmeware_version="default", channel="can0")
-```
-
----
-
-## 创建实例并连接
-
-### 创建配置参数 — `create_agx_arm_config()`
-
-**功能说明：** 生成机械臂所需的配置字典，用于后续创建 Driver 实例。
-
-**函数定义：**
-
-```python
-create_agx_arm_config(
-    robot: Literal["nero", "piper", "piper_h", "piper_l", "piper_x"],
-    comm: Literal["can"] = "can",
-    firmeware_version: str = "default",
-    **kwargs,
-) -> dict
-```
-
-**参数说明：**
-
-| 名称 | 类型 | 说明 |
-| --- | --- | --- |
-| `robot` | `str` | 机械臂型号。推荐使用 `ArmModel` 常量：`ArmModel.NERO` / `ArmModel.PIPER` / `ArmModel.PIPER_H` / `ArmModel.PIPER_L` / `ArmModel.PIPER_X`（也兼容原始字符串） |
-| `comm` | `str` | 通讯类型，可选值：`"can"`（默认）。注意：`comm` 不是 CAN 通道名，CAN 通道由 `channel` 指定 |
-| `firmeware_version` | `str` | 主控固件版本。推荐使用按机型分类的常量：Nero 系列 → `NeroFW.DEFAULT` / `NeroFW.V111`。选择方法见[固件版本选择](#固件版本选择)。默认 `"default"` |
-
-**可选关键字参数（`**kwargs`）：**
-
-| 名称 | 类型 | 说明 |
-| --- | --- | --- |
-| `joint_limits` | `dict` | 自定义关节限位（单位：rad）。默认自动赋值，暂不会将手动输入的限位生效到实际控制中。示例见下文 |
-| `auto_set_motion_mode` | `bool` | 是否在发送运动类 API 前由 SDK 自动切换到所需运动模式。默认 `True`。如果你希望在自己的上层逻辑中显式控制模式切换，可设为 `False`。 |
-| `enable_joint_limits` | `bool` | 是否在运行时运动接口中启用关节软件限位夹紧。默认 `True`。设为 `False` 时跳过机型 `joint_limits` 夹紧（仍保留基础数值范围检查）。 |
-| `channel` | `str` | CAN 通道标识，默认 `"can0"`。当前文档已验证的写法为：`"agx_cando"` 使用 `"0"`、`"1"`、`"2"` 这类设备索引字符串；`"socketcan"` 使用 Linux 下的 CAN 网卡名，例如 `"can0"` 或重命名后的接口名；`"slcan"` 在 macOS（`Darwin`）下使用串口设备路径，例如 `"/dev/ttyACM0"`。 |
-| `interface` | `str` | CAN 接口类型，默认 `"socketcan"`。当前文档已验证并提供说明的取值为 Linux 下的 `"socketcan"`、Windows 下 Agilex CANDO 后端使用的 `"agx_cando"`、以及 macOS（`Darwin`）下的 `"slcan"`。 |
-| `bitrate` | `int` | CAN 波特率，默认 `1000000`（1 Mbps） |
-| `enable_check_can` | `bool` | 是否在创建 Comm 实例时检查 CAN 模块，默认 `True`。当前该预检查主要只对 Linux `socketcan` 生效；其他后端（如 Windows `agx_cando`、macOS `slcan`）通常会在实际打开 CAN bus 时完成可用性检查。 |
-| `auto_connect` | `bool` | 是否自动创建 CAN Bus 实例，默认 `True` |
-| `timeout` | `float` | CAN Bus 读写超时时间（秒），默认 `0.001` |
-| `receive_own_messages` | `bool` | 是否让本地 CAN 后端接收由同一进程/设备发送出去的报文。默认 `False`。适合调试、回环测试或单节点联调，正常机械臂控制一般不建议开启。具体是否生效取决于所选 `interface`。macOS 下的 `slcan` 后端通常**不支持**该项；使用 `interface="slcan"` 时**不要**传入。 |
-| `local_loopback` | `bool` | 是否开启 CAN **本地回环**。默认 `False`（关闭回环），本地终端/进程将**无法**接收到自己发送的 CAN 报文。调试时可选择开启，但**不建议**在正常使用 SDK 时开启，因为可能会占用读取 bus 的资源并影响读取性能。macOS 下的 `slcan` 后端通常**不支持**该项；使用 `interface="slcan"` 时**不要**传入。 |
-
-**返回值：** `dict`
-
-```json
-{
-    "robot": "nero",
-    "firmeware_version": "default",
-    "joint_names": ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6", "joint7"],
-    "joint_limits": {
-        "joint1": [-2.705261, 2.705261],
-        "joint2": [-1.745330, 1.745330],
-        "joint3": [-2.757621, 2.757621],
-        "joint4": [-1.012291, 2.146755],
-        "joint5": [-2.757621, 2.757621],
-        "joint6": [-0.733039, 0.959932],
-        "joint7": [-1.570797, 1.570797]
-    },
-    "comm": {
-        "type": "can",
-        "can": {
-            "channel": "can0",
-            "interface": "socketcan",
-            "bitrate": 1000000,
-            "enable_check_can": true,
-            "auto_connect": true,
-            "timeout": 0.001,
-            "receive_own_messages": false,
-            "local_loopback": false
-        }
-    }
-}
-```
-
-> **说明：** `auto_set_motion_mode` 只有在显式传入时，才会出现在返回配置的顶层字段中。
-
-已验证的接口与通道填写示例：
-
-- Linux `socketcan`：`create_agx_arm_config(..., interface="socketcan", channel="can0")`
-- Windows `agx_cando`：`create_agx_arm_config(..., interface="agx_cando", channel="0")`
-- macOS `slcan`：`create_agx_arm_config(..., interface="slcan", channel="/dev/ttyACM0")`
-
-在 Windows 上使用 `interface="agx_cando"` 前，需要先单独安装 `python-can-agx-cando` 插件。可先从 `https://github.com/agilexrobotics/python-can-agx-cando.git` 克隆仓库，再进入仓库目录执行 `pip3 install .` 完成安装。
-在 macOS（`Darwin`）下使用 `interface="slcan"` 且默认通道时，需要先给予串口权限。
-
-**使用示例：**
-
-```python
-from pyAgxArm import create_agx_arm_config, ArmModel, NeroFW
-
-cfg = create_agx_arm_config(robot=ArmModel.NERO, firmeware_version=NeroFW.DEFAULT, channel="can0")
-print(cfg)
-```
-
----
-
-### 创建机械臂 Driver 实例 — `AgxArmFactory.create_arm()`
-
-**功能说明：** 根据配置字典，通过工厂方法创建对应的机械臂 Driver 实例。
-
-**函数定义：**
-
-```python
-create_arm(cls, config: dict, **kwargs) -> T
-```
-
-**参数说明：**
-
-| 名称 | 类型 | 说明 |
-| --- | --- | --- |
-| `config` | `dict` | 由 `create_agx_arm_config()` 生成的配置字典 |
-
-**返回值：** `Driver` — 不同臂型号、通讯方式、固件版本对应不同的实例。
-
-**使用示例：**
-
-```python
-from pyAgxArm import create_agx_arm_config, AgxArmFactory, ArmModel, NeroFW
-
-cfg = create_agx_arm_config(robot=ArmModel.NERO, firmeware_version=NeroFW.DEFAULT, channel="can0")
-robot = AgxArmFactory.create_arm(cfg)
-```
-
----
-
-### 创建连接 — `connect()`
-
-**功能说明：** 创建连接并启动数据读取线程。
-
-**函数定义：**
-
-```python
-connect(self, start_read_thread: bool = True) -> None
-```
-
-**参数说明：**
-
-| 名称 | 类型 | 说明 |
-| --- | --- | --- |
-| `start_read_thread` | `bool` | 是否启动读取数据线程，默认 `True` |
-
-**使用示例：**
-
-```python
-from pyAgxArm import create_agx_arm_config, AgxArmFactory, ArmModel, NeroFW
-
-cfg = create_agx_arm_config(robot=ArmModel.NERO, firmeware_version=NeroFW.DEFAULT, channel="can0")
-robot = AgxArmFactory.create_arm(cfg)
-robot.connect()
-```
-
----
-
-### 断开连接 — `disconnect()`
-
-**功能说明：** 断开机械臂连接，并释放后台线程与 CAN 资源。
-
-该方法是 **幂等（idempotent）** 的：重复调用不会报错。通常用于“当前 `robot` 实例不再需要”的场景，例如读完固件版本后准备创建新的实例。
-
-> **注意：** 调用 `disconnect()` 后，底层通信句柄可能会被释放；此时调用 `robot.is_connected()` 会返回 `False`。
-
-**函数定义：**
-
-```python
-disconnect(self, join_timeout: float = 1.0) -> None
-```
-
-**参数说明：**
-
-| 名称 | 类型 | 说明 |
-| --- | --- | --- |
-| `join_timeout` | `float` | 关闭时等待后台线程退出的超时时间（秒），默认 `1.0` |
-
-**使用示例：**
-
-```python
-from pyAgxArm import create_agx_arm_config, AgxArmFactory, ArmModel, NeroFW
-
-cfg = create_agx_arm_config(robot=ArmModel.NERO, firmeware_version=NeroFW.DEFAULT, channel="can0")
-robot = AgxArmFactory.create_arm(cfg)
-robot.connect()
-print(robot.is_connected())
-
-robot.disconnect()
-print(robot.is_connected())
-```
-
----
-
-### 初始化末端执行器 — `init_effector()`
-
-**功能说明：** 初始化末端执行器 Driver，并返回对应的执行器实例（例如夹爪 / 灵巧手等）。
-
-> **注意：** 同一个 `robot` 实例 **只能初始化一次** 执行器。如需切换到其它执行器类型，请创建新的机械臂实例。
-
-**函数定义：**
-
-```python
-init_effector(self, effector: str) -> EffectorDriver
-```
-
-**参数说明：**
-
-| 名称 | 类型 | 说明 |
-| --- | --- | --- |
-| `effector` | `str` | 执行器类型（建议使用 `robot.EFFECTOR.xxx` 常量） |
-
-**返回值：** `EffectorDriver`
-
-**使用示例：**
-
-```python
-from pyAgxArm import create_agx_arm_config, AgxArmFactory, ArmModel, NeroFW
-
-cfg = create_agx_arm_config(robot=ArmModel.NERO, firmeware_version=NeroFW.DEFAULT, channel="can0")
-robot = AgxArmFactory.create_arm(cfg)
-robot.connect()
-
-end_effector = robot.init_effector(robot.EFFECTOR.REVO2)
-```
-
----
-
-## 通用状态
-
-### 获取关节数量 — `joint_nums`
-
-**功能说明：** 获取机械臂关节数量（例如 Nero 为 7）。
-
-**属性定义：**
-
-```python
-joint_nums: int
-```
-
-**返回值：** `int`
-
-**使用示例：**
-
-```python
-import time
-from pyAgxArm import create_agx_arm_config, AgxArmFactory, ArmModel, NeroFW
-
-cfg = create_agx_arm_config(robot=ArmModel.NERO, firmeware_version=NeroFW.DEFAULT, channel="can0")
-robot = AgxArmFactory.create_arm(cfg)
-robot.connect()
-
-print("robotic arm joint_nums =", robot.joint_nums)
-
-for joint_index in range(1, robot.joint_nums + 1):
-    start_t = time.monotonic()
-    while True:
-        if robot.enable(joint_index):
-            print(f"enable joint {joint_index} success")
-            break
-        if time.monotonic() - start_t > 5.0:
-            print(f"enable joint {joint_index} timeout (5s)")
-            break
-        time.sleep(0.01)
 ```
 
 ---
@@ -2253,7 +1483,10 @@ while True:
 **函数定义：**
 
 ```python
-get_motor_states(self, joint_index: Literal[1, 2, 3, 4, 5, 6, 7]) -> MessageAbstract[ArmMsgFeedbackHighSpd] | None
+get_motor_states(
+    self,
+    joint_index: Literal[1, 2, 3, 4, 5, 6, 7],
+) -> MessageAbstract[ArmMsgFeedbackHighSpd] | None
 ```
 
 **参数说明：**
@@ -2297,7 +1530,10 @@ if ms is not None:
 **函数定义：**
 
 ```python
-get_driver_states(self, joint_index: Literal[1, 2, 3, 4, 5, 6, 7]) -> MessageAbstract[ArmMsgFeedbackLowSpd] | None
+get_driver_states(
+    self,
+    joint_index: Literal[1, 2, 3, 4, 5, 6, 7],
+) -> MessageAbstract[ArmMsgFeedbackLowSpd] | None
 ```
 
 **参数说明：**
@@ -2343,7 +1579,10 @@ if ds is not None:
 **函数定义：**
 
 ```python
-get_joint_enable_status(self, joint_index: Literal[1, 2, 3, 4, 5, 6, 7, 255]) -> bool
+get_joint_enable_status(
+    self,
+    joint_index: Literal[1, 2, 3, 4, 5, 6, 7, 255],
+) -> bool
 ```
 
 **参数说明：**
@@ -2402,7 +1641,11 @@ print(robot.get_joints_enable_status_list())
 **函数定义：**
 
 ```python
-get_firmware(self, timeout: float = 1.0, min_interval: float = 1.0) -> dict | None
+get_firmware(
+    self,
+    timeout: float = 1.0,
+    min_interval: float = 1.0,
+) -> dict | None
 ```
 
 **参数说明：**
@@ -2482,7 +1725,10 @@ robot.set_speed_percent(100)
 **函数定义：**
 
 ```python
-set_motion_mode(self, motion_mode: Literal["p", "j", "l", "c", "mit", "js"] = "p") -> None
+set_motion_mode(
+    self,
+    motion_mode: Literal["p", "j", "l", "c", "mit", "js"] = "p",
+) -> None
 ```
 
 **参数说明：**
@@ -2501,286 +1747,6 @@ robot = AgxArmFactory.create_arm(cfg)
 robot.connect()
 
 robot.set_motion_mode(robot.OPTIONS.MOTION_MODE.P)
-```
-
----
-
-## TCP 相关
-
-### 设置 TCP 偏移 — `set_tcp_offset()`
-
-**功能说明：** 设置 TCP（工具中心点）相对于法兰（`flange`）的偏移位姿（在 **法兰坐标系** 下）。默认无偏移：`[0, 0, 0, 0, 0, 0]`。
-
-> **提示：** 该偏移值仅保存在 SDK/Driver 实例内，不会下发到控制器。
-
-**函数定义：**
-
-```python
-set_tcp_offset(self, pose: list[float]) -> None
-```
-
-**参数说明：**
-
-| 名称 | 类型 | 说明 |
-| --- | --- | --- |
-| `pose` | `list[float]` | TCP 在法兰坐标系下的位姿偏移 `[x, y, z, roll, pitch, yaw]`：`x, y, z` 为位置（m）；`roll, pitch, yaw` 为欧拉角（rad）。范围：`roll/yaw` ∈ `[-π, π]`，`pitch` ∈ `[-π/2, π/2]` |
-
-**使用示例：**
-
-```python
-from pyAgxArm import create_agx_arm_config, AgxArmFactory, ArmModel, NeroFW
-
-cfg = create_agx_arm_config(robot=ArmModel.NERO, firmeware_version=NeroFW.DEFAULT, channel="can0")
-robot = AgxArmFactory.create_arm(cfg)
-robot.connect()
-
-robot.set_tcp_offset([0.0, 0.0, 0.10, 0.0, 0.0, 0.0])
-```
-
----
-
-### 获取 TCP 位姿 — `get_tcp_pose()`
-
-**功能说明：** 获取 TCP 位姿。该接口会先读取法兰位姿，然后根据 `set_tcp_offset()` 保存的偏移值做刚体变换得到 TCP 位姿。若未设置偏移，则 TCP 位姿与法兰位姿相同。
-
-**函数定义：**
-
-```python
-get_tcp_pose(self) -> MessageAbstract[list[float]] | None
-```
-
-**返回值：** `MessageAbstract[list[float]] | None`
-
-`.msg` 为长度 6 的 `list[float]`：`[x, y, z, roll, pitch, yaw]`（m / rad）。
-
-**使用示例：**
-
-```python
-import time
-from pyAgxArm import create_agx_arm_config, AgxArmFactory, ArmModel, NeroFW
-
-cfg = create_agx_arm_config(robot=ArmModel.NERO, firmeware_version=NeroFW.DEFAULT, channel="can0")
-robot = AgxArmFactory.create_arm(cfg)
-robot.connect()
-
-robot.set_tcp_offset([0.0, 0.0, 0.10, 0.0, 0.0, 0.0])
-
-while True:
-    tcp = robot.get_tcp_pose()
-    if tcp is not None:
-        print(tcp.msg)
-        print(tcp.hz, tcp.timestamp)
-    time.sleep(0.02)
-```
-
----
-
-### 法兰位姿转 TCP 位姿 — `get_flange2tcp_pose()`
-
-**功能说明：** 输入法兰位姿（基座/世界坐标系下），根据 `set_tcp_offset()` 保存的偏移值算出对应的 TCP 位姿。
-
-**函数定义：**
-
-```python
-get_flange2tcp_pose(self, flange_pose: list[float]) -> list[float]
-```
-
-**参数说明：**
-
-| 名称 | 类型 | 说明 |
-| --- | --- | --- |
-| `flange_pose` | `list[float]` | 法兰位姿 `[x, y, z, roll, pitch, yaw]`（m / rad）。范围：`roll/yaw` ∈ `[-π, π]`，`pitch` ∈ `[-π/2, π/2]` |
-
-**返回值：** `list[float]` — TCP 位姿 `[x, y, z, roll, pitch, yaw]`（m / rad）。
-
-**使用示例：**
-
-```python
-from pyAgxArm import create_agx_arm_config, AgxArmFactory, ArmModel, NeroFW
-
-cfg = create_agx_arm_config(robot=ArmModel.NERO, firmeware_version=NeroFW.DEFAULT, channel="can0")
-robot = AgxArmFactory.create_arm(cfg)
-robot.connect()
-
-robot.set_tcp_offset([0.0, 0.0, 0.10, 0.0, 0.0, 0.0])
-
-# 直接指定法兰位姿
-tcp_pose = robot.get_flange2tcp_pose([-0.45, -0.0, 0.45, -1.5708, 0.0, -3.14159])
-print("tcp_pose =", tcp_pose)
-
-# 从当前位姿获取，结果与 get_tcp_pose() 得到的 pose 相同
-flange_pose = robot.get_flange_pose()
-if flange_pose is not None:
-    tcp_pose = robot.get_flange2tcp_pose(flange_pose)
-    print("tcp_pose =", tcp_pose)
-```
-
----
-
-### TCP 位姿转法兰位姿 — `get_tcp2flange_pose()`
-
-**功能说明：** 输入目标 TCP 位姿（基座/世界坐标系下），根据 `set_tcp_offset()` 保存的偏移值算出对应的目标法兰位姿。将返回的法兰位姿传给 `move_p()`，即可实现 **TCP 运动到目标 TCP 位姿**。
-
-**函数定义：**
-
-```python
-get_tcp2flange_pose(self, tcp_pose: list[float]) -> list[float]
-```
-
-**参数说明：**
-
-| 名称 | 类型 | 说明 |
-| --- | --- | --- |
-| `tcp_pose` | `list[float]` | 目标 TCP 位姿 `[x, y, z, roll, pitch, yaw]`（m / rad）。范围：`roll/yaw` ∈ `[-π, π]`，`pitch` ∈ `[-π/2, π/2]` |
-
-**返回值：** `list[float]` — 目标法兰位姿 `[x, y, z, roll, pitch, yaw]`（m / rad），可直接用于 `move_p()`。
-
-**使用示例：**
-
-```python
-from pyAgxArm import create_agx_arm_config, AgxArmFactory, ArmModel, NeroFW
-
-cfg = create_agx_arm_config(robot=ArmModel.NERO, firmeware_version=NeroFW.DEFAULT, channel="can0")
-robot = AgxArmFactory.create_arm(cfg)
-robot.connect()
-
-robot.set_tcp_offset([0.0, 0.0, 0.10, 0.0, 0.0, 0.0])
-
-target_tcp_pose = [-0.45, -0.0, 0.45, -1.5708, 0.0, -3.14159]
-target_flange_pose = robot.get_tcp2flange_pose(target_tcp_pose)
-print("target_flange_pose =", target_flange_pose)
-
-# robot.move_p(target_flange_pose)  # 注意：会触发运动
-```
-
----
-
-## 运动学相关
-
-### 正运动学 — `fk()`
-
-**功能说明：** 根据给定关节角度，使用机械臂内置的改进 DH（MDH）模型计算末端**法兰位姿**。
-
-该接口为**离线计算**（不依赖 CAN 通信）。输出位姿格式与 [get_flange_pose()](#读取法兰位姿--get_flange_pose) 返回的 `.msg` 一致：  
-`[x, y, z, roll, pitch, yaw]`（基坐标系），其中 `x/y/z` 单位为米，`roll/pitch/yaw` 单位为弧度（SDK 采用 ZYX 的 RPY 约定）。
-
-> **注意：** Nero 为 7 轴，`fk()` 输入的关节角列表长度为 7。
-
-**函数定义：**
-
-```python
-fk(self, joint_angles: list[float]) -> list[float]
-```
-
-**参数说明：**
-
-| 名称 | 类型 | 说明 |
-| --- | --- | --- |
-| `joint_angles` | `list[float]` | 关节角度（单位：rad），长度 7：`[j1, j2, j3, j4, j5, j6, j7]` |
-
-**返回值：** `list[float]`
-
-`[x, y, z, roll, pitch, yaw]` — 法兰位姿（基坐标系）。
-
-**使用示例：**
-
-1）与 [get_joint_angles()](#读取关节角度--get_joint_angles) 组合（读取当前关节角 → FK）：
-
-```python
-ja = robot.get_joint_angles()
-if ja is not None:
-    flange_pose = robot.fk(ja.msg)
-    print("fk 法兰:", flange_pose)
-```
-
-2）与 [get_leader_joint_angles()](#读取主导臂leader关节角度--get_leader_joint_angles) 组合（读取主导臂角度 → FK）：
-
-```python
-mja = robot.get_leader_joint_angles()
-if mja is not None:
-    leader_flange_pose = robot.fk(mja.msg)
-    print("leader fk 法兰:", leader_flange_pose)
-```
-
-3）与 [get_flange2tcp_pose()](#法兰位姿转-tcp-位姿--get_flange2tcp_pose) 组合（FK 法兰 → 推导 TCP）：
-
-```python
-ja = robot.get_joint_angles()
-if ja is not None:
-    flange_pose = robot.fk(ja.msg)
-    tcp_pose = robot.get_flange2tcp_pose(flange_pose)
-    print("fk TCP:", tcp_pose)
-```
-
-4）对比“测得法兰位姿”与“FK 计算位姿”（快速一致性检查）：
-
-```python
-ja = robot.get_joint_angles()
-fp = robot.get_flange_pose()
-if ja is not None and fp is not None:
-    fk_fp = robot.fk(ja.msg)
-    print("测得法兰:", fp.msg)
-    print("fk 法兰:", fk_fp)
-```
-
----
-
-## SDK 配置相关
-
-### 设置自动切换运动模式开关 — `set_auto_set_motion_mode_enabled()`
-
-**功能说明：** 运行时设置在调用 `move_*` 接口时，是否自动执行 `set_motion_mode()` 切换。
-
-- `True`：保持自动切换（默认）。
-- `False`：不自动切换，需要你按需手动调用 `set_motion_mode()`。
-
-**函数定义：**
-
-```python
-set_auto_set_motion_mode_enabled(self, enabled: bool) -> None
-```
-
-**参数说明：**
-
-| 名称 | 类型 | 说明 |
-| --- | --- | --- |
-| `enabled` | `bool` | 是否启用自动切换运动模式 |
-
-**使用示例：**
-
-```python
-robot.set_auto_set_motion_mode_enabled(False)
-robot.set_motion_mode(robot.OPTIONS.MOTION_MODE.J)
-robot.move_j([0.0] * robot.joint_nums)
-```
-
----
-
-### 设置关节软件限位开关 — `set_joint_limits_enabled()`
-
-**功能说明：** 运行时设置是否启用关节软件限位。
-
-- `True`：按配置的 `joint_limits` / 机型限位进行夹紧保护。
-- `False`：跳过机型 `joint_limits` 夹紧，仅保留基础数值范围保护。
-
-**函数定义：**
-
-```python
-set_joint_limits_enabled(self, enabled: bool) -> None
-```
-
-**参数说明：**
-
-| 名称 | 类型 | 说明 |
-| --- | --- | --- |
-| `enabled` | `bool` | 是否启用关节软件限位 |
-
-**使用示例：**
-
-```python
-robot.set_joint_limits_enabled(False)
-robot.move_j([0.0] * robot.joint_nums)
-robot.set_joint_limits_enabled(True)
 ```
 
 ---
@@ -2916,7 +1882,10 @@ while True:
 **函数定义：**
 
 ```python
-enable(self, joint_index: Literal[1, 2, 3, 4, 5, 6, 7, 255] = 255) -> bool
+enable(
+    self,
+    joint_index: Literal[1, 2, 3, 4, 5, 6, 7, 255] = 255,
+) -> bool
 ```
 
 **参数说明：**
@@ -2954,7 +1923,10 @@ while not robot.enable():
 **函数定义：**
 
 ```python
-disable(self, joint_index: Literal[1, 2, 3, 4, 5, 6, 7, 255] = 255) -> bool
+disable(
+    self,
+    joint_index: Literal[1, 2, 3, 4, 5, 6, 7, 255] = 255,
+) -> bool
 ```
 
 **参数说明：**
@@ -3233,7 +2205,12 @@ while True:
 **函数定义：**
 
 ```python
-move_c(self, start_pose: list[float], mid_pose: list[float], end_pose: list[float]) -> None
+move_c(
+    self,
+    start_pose: list[float],
+    mid_pose: list[float],
+    end_pose: list[float],
+) -> None
 ```
 
 **参数说明：**
@@ -3358,4 +2335,55 @@ for i in range(1, robot.joint_nums + 1):
         kd=0.8,
         t_ff=0.0,
     )
+```
+
+---
+
+## CPV 运动与参数
+
+CPV 模式提供了关节 **位置/速度指令** 与参数读写接口。  
+调用 CPV 接口时，SDK 会在需要时自动切换到 `MOVE_CPV` 运动模式。
+
+### CPV 指令接口
+
+| 接口 | 签名 | 说明 |
+| --- | --- | --- |
+| `move_cpv_pos` | `move_cpv_pos(self, joint_index: Literal[1, 2, 3, 4, 5, 6, 7], pos: float) -> None` | 下发 CPV 位置指令（rad）。若超出关节限位，SDK 会夹紧并输出告警日志。 |
+| `move_cpv_vel` | `move_cpv_vel(self, joint_index: Literal[1, 2, 3, 4, 5, 6, 7], vel: float) -> None` | 下发 CPV 速度指令（rad/s）。 |
+
+### CPV 参数读取接口
+
+所有读取接口都支持 `timeout` 与 `min_interval` 参数，返回 `float | None`。
+
+| 接口 | 单位/含义 |
+| --- | --- |
+| `get_cpv_pos(joint_index, timeout=1.0, min_interval=1.0)` | 关节位置（rad） |
+| `get_cpv_vel(joint_index, timeout=1.0, min_interval=1.0)` | 关节速度（rad/s） |
+| `get_cpv_acc(joint_index, timeout=1.0, min_interval=1.0)` | 加速度（rad/s^2） |
+| `get_cpv_dcc(joint_index, timeout=1.0, min_interval=1.0)` | 减速度（rad/s^2） |
+| `get_cpv_cv(joint_index, timeout=1.0, min_interval=1.0)` | 轮廓/轨迹速度（rad/s） |
+| `get_cpv_pp(joint_index, timeout=1.0, min_interval=1.0)` | 位置环比例增益 |
+| `get_cpv_kp(joint_index, timeout=1.0, min_interval=1.0)` | 速度环比例增益 |
+| `get_cpv_ki(joint_index, timeout=1.0, min_interval=1.0)` | 速度环积分增益 |
+
+### CPV 参数写入接口
+
+写接口为 **ACK + 读回校验**，返回 `bool`。
+
+| 接口 | 说明 |
+| --- | --- |
+| `set_cpv_acc(joint_index, acc, timeout=1.0)` | 设置 CPV 加速度参数 |
+| `set_cpv_dcc(joint_index, dcc, timeout=1.0)` | 设置 CPV 减速度参数 |
+| `set_cpv_cv(joint_index, cv, timeout=1.0)` | 设置 CPV 轮廓/轨迹速度参数 |
+| `set_cpv_pp(joint_index, pp, timeout=1.0)` | 设置 CPV 位置环比例增益 |
+| `set_cpv_kp(joint_index, kp, timeout=1.0)` | 设置 CPV 速度环比例增益 |
+| `set_cpv_ki(joint_index, ki, timeout=1.0)` | 设置 CPV 速度环积分增益 |
+
+**快速示例：**
+
+```python
+ok = robot.set_cpv_acc(joint_index=1, acc=2.0)
+print("set_cpv_acc:", ok)
+print("cpv_acc =", robot.get_cpv_acc(joint_index=1))
+robot.move_cpv_vel(joint_index=1, vel=0.2)
 ```

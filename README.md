@@ -28,6 +28,7 @@
 | --- | --- |
 | ROS | [agx_arm_ros](https://github.com/agilexrobotics/agx_arm_ros) |
 | CAN module manual | [docs/can_user.md](./docs/can_user.md#can-module-manual) |
+| Arm Common API | [docs/arm_common_api.md](./docs/arm_common_api.md#arm-common-api-documentation) |
 | Piper API | [docs/piper/piper_api.md](./docs/piper/piper_api.md#piper-api-documentation) |
 | Nero API | [docs/nero/nero_api.md](./docs/nero/nero_api.md#nero-api-documentation) |
 | AgxGripper API | [docs/effector/agx_gripper/agx_gripper_api.md](./docs/effector/agx_gripper/agx_gripper_api.md#agxgripper-api-documentation) |
@@ -164,6 +165,7 @@ while True:
 | --- | --- |
 | ROS | [agx_arm_ros](https://github.com/agilexrobotics/agx_arm_ros) |
 | CAN 模块手册 | [docs/can_user.md](./docs/can_user.md#can-模块使用手册) |
+| Arm 通用 API | [docs/arm_common_api.md](./docs/arm_common_api.md#arm-通用-api-使用文档) |
 | Piper API | [docs/piper/piper_api.md](./docs/piper/piper_api.md#piper-机械臂-api-使用文档) |
 | Nero API | [docs/nero/nero_api.md](./docs/nero/nero_api.md#nero-机械臂-api-使用文档) |
 | AgxGripper API | [docs/effector/agx_gripper/agx_gripper_api.md](./docs/effector/agx_gripper/agx_gripper_api.md#agxgripper-夹爪-api-使用文档) |
