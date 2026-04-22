@@ -1,3 +1,4 @@
+import logging
 import pytest
 
 from pyAgxArm import AgxArmFactory, ArmModel, PiperFW, create_agx_arm_config
@@ -348,3 +349,27 @@ def test_piper_driver_virtual_can_cpv_each_public_api_once():
         arm.disconnect()
     finally:
         device.stop()
+
+
+def test_piper_driver_log_member_can_enable_bridge_callbacks():
+    channel = new_virtual_channel("ci_piper_log_member")
+    arm = _make_piper_arm(PiperFW.DEFAULT, channel)
+    captured = []
+
+    arm.log.configure(level=logging.WARNING)
+    arm.log.bridge_enable(
+        warning=captured.append,
+        replace_handlers=True,
+        propagate=False,
+    )
+    try:
+        with pytest.raises(RuntimeError):
+            # Trigger warning before send() by overflow input.
+            arm.move_mit(1, p_des=999.0)
+    finally:
+        arm.log.bridge_disable()
+
+    assert captured
+    assert any("Desired position" in msg for msg in captured)
+
+
