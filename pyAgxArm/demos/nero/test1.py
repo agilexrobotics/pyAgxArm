@@ -68,6 +68,24 @@ end_effector = robot.init_effector(robot.OPTIONS.EFFECTOR.AGX_GRIPPER)
 print(end_effector.__doc__)
 
 
+# -------------------------- Logger ---------------------------
+
+# robot.log.configure(level=robot.log.Level.WARNING)
+
+# robot.log.console_enable(level=robot.log.Level.WARNING)
+# robot.log.console_disable()
+
+# robot.log.bridge_enable(
+#     debug=print,
+#     info=print,
+#     warning=print,
+#     error=print,
+#     level=robot.log.Level.INFO,
+#     formatter=robot.log.Formats.FULL
+# )
+# robot.log.bridge_disable()
+
+
 # -------------------------- Factory ---------------------------
 
 # AgxArmFactory.set_reuse_policy("new")
