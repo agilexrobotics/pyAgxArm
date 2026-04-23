@@ -10,6 +10,9 @@
 - [Create Instance and Connect](#create-instance-and-connect)
   - [Create Configuration — create_agx_arm_config()](#create-configuration--create_agx_arm_config)
   - [Create Arm Driver Instance — AgxArmFactory.create_arm()](#create-arm-driver-instance--agxarmfaborycreate_arm)
+  - [Set Factory Reuse Policy — AgxArmFactory.set_reuse_policy()](#set-factory-reuse-policy--agxarmfactoryset_reuse_policy)
+  - [Get Factory Reuse Policy — AgxArmFactory.get_reuse_policy()](#get-factory-reuse-policy--agxarmfactoryget_reuse_policy)
+  - [Detect Available CAN Configs — AgxArmFactory.detect_can_configs()](#detect-available-can-configs--agxarmfactorydetect_can_configs)
   - [Connect — connect()](#connect--connect)
   - [Disconnect — disconnect()](#disconnect--disconnect)
   - [Initialize End Effector — init_effector()](#initialize-end-effector--init_effector)
@@ -234,6 +237,90 @@ from pyAgxArm import create_agx_arm_config, AgxArmFactory, ArmModel, NeroFW
 
 cfg = create_agx_arm_config(robot=ArmModel.NERO, firmeware_version=NeroFW.DEFAULT, channel="can0")
 robot = AgxArmFactory.create_arm(cfg)
+```
+
+---
+
+### Set Factory Reuse Policy — `AgxArmFactory.set_reuse_policy()`
+
+**Description:** Set the global instance reuse policy used by `AgxArmFactory.create_arm()`.
+
+**Function Definition:**
+
+```python
+set_reuse_policy(cls, reuse_policy: Literal["new", "reuse", "replace"]) -> None
+```
+
+**Parameters:**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `reuse_policy` | `Literal["new","reuse","replace"]` | `"new"`: always create a new instance; `"reuse"`: return cached live instance if available; `"replace"`: disconnect cached live instance first, then create a new one |
+
+**Usage Example:**
+
+```python
+from pyAgxArm import AgxArmFactory
+
+AgxArmFactory.set_reuse_policy("reuse")
+```
+
+---
+
+### Get Factory Reuse Policy — `AgxArmFactory.get_reuse_policy()`
+
+**Description:** Read current global factory reuse policy.
+
+**Function Definition:**
+
+```python
+get_reuse_policy(cls) -> Literal["new", "reuse", "replace"]
+```
+
+**Return Value:** `Literal["new", "reuse", "replace"]`
+
+**Usage Example:**
+
+```python
+from pyAgxArm import AgxArmFactory
+
+print(AgxArmFactory.get_reuse_policy())
+```
+
+---
+
+### Detect Available CAN Configs — `AgxArmFactory.detect_can_configs()`
+
+**Description:** Probe CAN backend configurations via `python-can` and return detected interface/channel candidates.
+
+**Function Definition:**
+
+```python
+detect_can_configs(
+    cls,
+    interfaces: Any = None,
+    *,
+    timeout: float = 5.0,
+) -> list[dict[str, Any]]
+```
+
+**Parameters:**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `interfaces` | `Any` | Optional backend filter passed through to `python-can detect_available_configs` |
+| `timeout` | `float` | Detect timeout in seconds, default `5.0` |
+
+**Return Value:** `list[dict[str, Any]]` — May be empty when no adapters are found or backend does not support detection.
+
+**Usage Example:**
+
+```python
+from pyAgxArm import AgxArmFactory
+
+configs = AgxArmFactory.detect_can_configs(timeout=3.0)
+for cfg in configs:
+    print(cfg)
 ```
 
 ---
@@ -1802,6 +1889,9 @@ robot.move_cpv_vel(joint_index=1, vel=0.2)
 - [创建实例并连接](#创建实例并连接)
   - [创建配置参数 — create_agx_arm_config()](#创建配置参数--create_agx_arm_config)
   - [创建机械臂 Driver 实例 — AgxArmFactory.create_arm()](#创建机械臂-driver-实例--agxarmfactorycreate_arm)
+  - [设置工厂实例复用策略 — AgxArmFactory.set_reuse_policy()](#设置工厂实例复用策略--agxarmfactoryset_reuse_policy)
+  - [获取工厂实例复用策略 — AgxArmFactory.get_reuse_policy()](#获取工厂实例复用策略--agxarmfactoryget_reuse_policy)
+  - [探测可用 CAN 配置 — AgxArmFactory.detect_can_configs()](#探测可用-can-配置--agxarmfactorydetect_can_configs)
   - [创建连接 — connect()](#创建连接--connect)
   - [断开连接 — disconnect()](#断开连接--disconnect)
   - [初始化末端执行器 — init_effector()](#初始化末端执行器--init_effector)
@@ -2024,6 +2114,90 @@ from pyAgxArm import create_agx_arm_config, AgxArmFactory, ArmModel, NeroFW
 
 cfg = create_agx_arm_config(robot=ArmModel.NERO, firmeware_version=NeroFW.DEFAULT, channel="can0")
 robot = AgxArmFactory.create_arm(cfg)
+```
+
+---
+
+### 设置工厂实例复用策略 — `AgxArmFactory.set_reuse_policy()`
+
+**功能说明：** 设置 `AgxArmFactory.create_arm()` 的全局实例复用策略。
+
+**函数定义：**
+
+```python
+set_reuse_policy(cls, reuse_policy: Literal["new", "reuse", "replace"]) -> None
+```
+
+**参数说明：**
+
+| 名称 | 类型 | 说明 |
+| --- | --- | --- |
+| `reuse_policy` | `Literal["new","reuse","replace"]` | `"new"`：始终创建新实例；`"reuse"`：若缓存中有存活实例则直接复用；`"replace"`：先断开缓存实例再创建新实例 |
+
+**使用示例：**
+
+```python
+from pyAgxArm import AgxArmFactory
+
+AgxArmFactory.set_reuse_policy("reuse")
+```
+
+---
+
+### 获取工厂实例复用策略 — `AgxArmFactory.get_reuse_policy()`
+
+**功能说明：** 获取当前全局工厂实例复用策略。
+
+**函数定义：**
+
+```python
+get_reuse_policy(cls) -> Literal["new", "reuse", "replace"]
+```
+
+**返回值：** `Literal["new", "reuse", "replace"]`
+
+**使用示例：**
+
+```python
+from pyAgxArm import AgxArmFactory
+
+print(AgxArmFactory.get_reuse_policy())
+```
+
+---
+
+### 探测可用 CAN 配置 — `AgxArmFactory.detect_can_configs()`
+
+**功能说明：** 通过 `python-can` 探测当前环境可用的 CAN 后端配置，返回可用的接口/通道候选列表。
+
+**函数定义：**
+
+```python
+detect_can_configs(
+    cls,
+    interfaces: Any = None,
+    *,
+    timeout: float = 5.0,
+) -> list[dict[str, Any]]
+```
+
+**参数说明：**
+
+| 名称 | 类型 | 说明 |
+| --- | --- | --- |
+| `interfaces` | `Any` | 可选后端过滤条件，透传给 `python-can detect_available_configs` |
+| `timeout` | `float` | 探测超时时间（秒），默认 `5.0` |
+
+**返回值：** `list[dict[str, Any]]` —— 当没有发现适配器或当前后端不支持探测时，可能返回空列表。
+
+**使用示例：**
+
+```python
+from pyAgxArm import AgxArmFactory
+
+configs = AgxArmFactory.detect_can_configs(timeout=3.0)
+for cfg in configs:
+    print(cfg)
 ```
 
 ---

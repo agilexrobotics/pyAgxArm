@@ -1,6 +1,6 @@
 # agx_arm_factory.pyi
 from typing_extensions import Literal
-from typing import Any, TypeVar, overload
+from typing import Any, Dict, List, TypeVar, overload
 from ..protocols.can_protocol.drivers import (
     NeroDriverDefault,
     NeroDriverV111,
@@ -180,8 +180,22 @@ def create_agx_arm_config(
 # ---------- AgxArmFactory ----------
 
 T = TypeVar("T", bound=Any)
+ReusePolicy = Literal["new", "reuse", "replace"]
 
 class AgxArmFactory:
+    @classmethod
+    def set_reuse_policy(cls, reuse_policy: ReusePolicy) -> None: ...
+
+    @classmethod
+    def get_reuse_policy(cls) -> ReusePolicy: ...
+
+    @classmethod
+    def detect_can_configs(
+        cls,
+        interfaces: Any = ...,
+        *,
+        timeout: float = ...,
+    ) -> List[Dict[str, Any]]: ...
 
     @classmethod
     @overload

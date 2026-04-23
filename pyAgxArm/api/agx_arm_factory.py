@@ -1,6 +1,11 @@
 import copy
+import hashlib
 import inspect
-from typing import Type, Dict, TypeVar
+import json
+import threading
+import time
+import weakref
+from typing import Any, Dict, List, Optional, Type, TypeVar
 from typing_extensions import Literal
 from .constants import ROBOT_OPTION_FIELDS, ROBOT_JOINT_LIMIT_PRESET, ROBOT_JOINT_NAME
 from ..protocols.can_protocol.comms import *
@@ -71,7 +76,7 @@ def create_agx_arm_config(
     **kwargs
         Additional keyword arguments forwarded to the comm layer
         (e.g. ``channel``, ``interface``, ``bitrate``), and robot options
-        (e.g. ``joint_limits``).
+        (e.g. ``joint_limits``, ``auto_set_motion_mode``).
     """
     config = {
         "robot": robot,
@@ -166,6 +171,164 @@ class AgxArmFactory:
             },
         },
     }
+    _instance_cache: Dict[str, Dict[str, Any]] = {}
+    _cache_lock = threading.RLock()
+    _reuse_policy: Literal["new", "reuse", "replace"] = "replace"
+
+    # -------------------------------------------------
+    @classmethod
+    def set_reuse_policy(cls, reuse_policy: Literal["new", "reuse", "replace"]) -> None:
+        """Set global instance reuse policy used by create_arm.
+        
+        Parameters
+        ----------
+        reuse_policy : Literal["new", "reuse", "replace"]
+            - "new": always create a new instance and refresh cache entry.
+            - "reuse": return cached live instance if available.
+            - "replace": disconnect cached live instance first, then create new.
+        """
+        if reuse_policy not in {"new", "reuse", "replace"}:
+            raise ValueError(
+                f"Invalid reuse_policy={reuse_policy!r}. "
+                "Expected one of: 'new', 'reuse', 'replace'."
+            )
+        with cls._cache_lock:
+            cls._reuse_policy = reuse_policy
+
+    @classmethod
+    def get_reuse_policy(cls) -> Literal["new", "reuse", "replace"]:
+        """Get current global instance reuse policy.
+        
+        Returns
+        -------
+        Literal["new", "reuse", "replace"]
+            - "new": always create a new instance and refresh cache entry.
+            - "reuse": return cached live instance if available.
+            - "replace": disconnect cached live instance first, then create new.
+        """
+        with cls._cache_lock:
+            return cls._reuse_policy
+
+    # -------------------------------------------------
+    @classmethod
+    def _normalize_for_fingerprint(cls, value: Any) -> Any:
+        """Normalize config values into JSON-serializable structures."""
+        if isinstance(value, dict):
+            return {
+                str(k): cls._normalize_for_fingerprint(v)
+                for k, v in value.items()
+            }
+        if isinstance(value, (list, tuple)):
+            return [cls._normalize_for_fingerprint(v) for v in value]
+        if isinstance(value, set):
+            normalized = [cls._normalize_for_fingerprint(v) for v in value]
+            return sorted(normalized, key=lambda item: repr(item))
+        if isinstance(value, (str, int, float, bool)) or value is None:
+            return value
+        return repr(value)
+
+    @classmethod
+    def _fingerprint_config(cls, config: dict) -> str:
+        """Build a stable hash fingerprint from full config content."""
+        normalized = cls._normalize_for_fingerprint(config)
+        serialized = json.dumps(
+            normalized,
+            sort_keys=True,
+            ensure_ascii=True,
+            separators=(",", ":"),
+        )
+        return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+    @classmethod
+    def _purge_cache_entry(cls, fingerprint: str, expected_ref: Optional[weakref.ref] = None) -> None:
+        with cls._cache_lock:
+            cache_entry = cls._instance_cache.get(fingerprint)
+            if cache_entry is None:
+                return
+            if expected_ref is not None and cache_entry.get("instance_ref") is not expected_ref:
+                return
+            cls._instance_cache.pop(fingerprint, None)
+
+    @classmethod
+    def _get_cached_instance(cls, config: dict) -> Optional[T]:
+        """Get live cached arm instance by config, or None."""
+        fingerprint = cls._fingerprint_config(config)
+        with cls._cache_lock:
+            cache_entry = cls._instance_cache.get(fingerprint)
+            if cache_entry is None:
+                return None
+            instance_ref: Optional[weakref.ref] = cache_entry.get("instance_ref")
+            if instance_ref is None:
+                cls._instance_cache.pop(fingerprint, None)
+                return None
+            instance = instance_ref()
+            if instance is None:
+                cls._instance_cache.pop(fingerprint, None)
+                return None
+            return instance
+
+    @classmethod
+    def _cache_instance(cls, config: dict, instance: T) -> str:
+        """Cache arm instance with weakref and finalize cleanup."""
+        fingerprint = cls._fingerprint_config(config)
+        instance_ref = weakref.ref(instance)
+        finalizer = weakref.finalize(
+            instance,
+            cls._purge_cache_entry,
+            fingerprint,
+            instance_ref,
+        )
+        with cls._cache_lock:
+            cls._instance_cache[fingerprint] = {
+                "instance_ref": instance_ref,
+                "created_at": time.time(),
+                "finalizer": finalizer,
+            }
+        return fingerprint
+
+    # -------------------------------------------------
+    @classmethod
+    def detect_can_configs(
+        cls,
+        interfaces: Any = None,
+        *,
+        timeout: float = 5.0,
+    ) -> List[Dict[str, Any]]:
+        """
+        Probe CAN backends using python-can ``detect_available_configs``.
+
+        Returns a list of plain dicts (typically ``interface``, ``channel``, …).
+        Returns an empty list if the installed python-can has no
+        ``detect_available_configs`` API. If the API exists but enumerates no
+        adapters, the list is also empty.
+
+        Raises
+        ------
+        Exception
+            Any exception raised by ``detect_available_configs`` (e.g. backend
+            errors) is propagated to the caller.
+        """
+        import can
+
+        detect_fn = getattr(can, "detect_available_configs", None)
+        if detect_fn is None:
+            print(
+                "[AgxArmFactory.detect_can_configs] python-can has no "
+                "detect_available_configs; returning empty list."
+            )
+            return []
+
+        out: List[Dict[str, Any]] = []
+        for item in detect_fn(interfaces=interfaces, timeout=timeout):
+            if isinstance(item, dict):
+                out.append(dict(item))
+                continue
+            asdict = getattr(item, "_asdict", None)
+            if callable(asdict):
+                out.append(dict(asdict()))
+            else:
+                out.append({"value": repr(item)})
+        return out
 
     # -------------------------------------------------
     @classmethod
@@ -213,5 +376,20 @@ class AgxArmFactory:
         """
         Create a robotic arm Driver instance.
         """
+        reuse_policy = cls.get_reuse_policy()
+
+        cached_instance: Optional[T] = None
+        if reuse_policy in {"reuse", "replace"}:
+            cached_instance = cls._get_cached_instance(config)
+            if reuse_policy == "reuse" and cached_instance is not None:
+                return cached_instance
+
+        if reuse_policy == "replace" and cached_instance is not None:
+            disconnect = getattr(cached_instance, "disconnect", None)
+            if callable(disconnect):
+                disconnect()
+
         arm_cls: Type[T] = cls.load_class(config)
-        return arm_cls(config=config, **kwargs)
+        arm_instance = arm_cls(config=config, **kwargs)
+        cls._cache_instance(config, arm_instance)
+        return arm_instance
