@@ -1,4 +1,5 @@
 import threading
+import weakref
 from typing import Optional, TYPE_CHECKING, overload, List
 
 from typing_extensions import Literal
@@ -37,6 +38,17 @@ class ArmDriverAbstract(ArmDriverInterface):
 
     _Parser = ProtocolParserInterface
 
+    @staticmethod
+    def _shutdown_ctx_on_finalize(ctx: DriverContext) -> None:
+        """Best-effort cleanup when driver instance is garbage collected."""
+        try:
+            ctx.shutdown()
+            ctx._parser_packet_fun_list.clear()
+            ctx._data_monitor_fun_list.clear()
+        except Exception:
+            # Finalizer must never raise; explicit disconnect remains preferred.
+            pass
+
     @property
     def OPTIONS(self):
         return DriverAPIOptions
@@ -48,6 +60,11 @@ class ArmDriverAbstract(ArmDriverInterface):
     def __init__(self, config: dict):
         self._config = config.copy()
         self._ctx = DriverContext(config)
+        self._gc_finalizer = weakref.finalize(
+            self,
+            self._shutdown_ctx_on_finalize,
+            self._ctx,
+        )
         self._connected = False
         self._effector_kind: Optional[str] = None
         self._effector = None
