@@ -239,6 +239,17 @@ class ArmDriverAbstract(ArmDriverInterface):
         # Stop internal DriverContext threads and FPS manager, and close comm
         self._ctx.shutdown(join_timeout=join_timeout)
 
+    def reconnect(self, join_timeout: float = 1.0, start_read_thread: bool = True) -> None:
+        """
+        Explicitly rebuild the current connection session.
+
+        This is the recommended recovery path after a communication error or
+        device reconnect event: fully disconnect the current session first,
+        then create a fresh connection and restart background threads.
+        """
+        self.disconnect(join_timeout=join_timeout)
+        self.connect(start_read_thread=start_read_thread)
+
     def is_connected(self) -> bool:
         comm = self._ctx.get_comm()
         if comm is None:

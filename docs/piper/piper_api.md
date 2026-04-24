@@ -17,6 +17,7 @@
   - [Detect Available CAN Configs — AgxArmFactory.detect_can_configs()](#detect-available-can-configs--agxarmfactorydetect_can_configs)
   - [Connect — connect()](#connect--connect)
   - [Disconnect — disconnect()](#disconnect--disconnect)
+  - [Reconnect — reconnect()](#reconnect--reconnect)
   - [Initialize End Effector — init_effector()](#initialize-end-effector--init_effector)
 - [General Status](#general-status)
   - [Get Joint Count — joint_nums](#get-joint-count--joint_nums)
@@ -410,6 +411,45 @@ print(robot.is_connected())
 
 robot.disconnect()
 print(robot.is_connected())
+```
+
+---
+
+### Reconnect — `reconnect()`
+
+**Description:** Explicitly rebuild the current communication session by disconnecting first and then connecting again.
+
+This API is recommended for recovery after transient CAN communication failures or after the CAN adapter/device is re-plugged.
+
+**Function Definition:**
+
+```python
+reconnect(self, join_timeout: float = 1.0, start_read_thread: bool = True) -> None
+```
+
+**Parameters:**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `join_timeout` | `float` | Timeout (seconds) for stopping existing threads/resources during the disconnect phase, default `1.0` |
+| `start_read_thread` | `bool` | Whether to start the data reading thread after reconnecting, default `True` |
+
+**Usage Example:**
+
+```python
+import time
+from pyAgxArm import create_agx_arm_config, AgxArmFactory, ArmModel, PiperFW
+
+cfg = create_agx_arm_config(robot=ArmModel.PIPER, firmeware_version=PiperFW.DEFAULT, channel="can0")
+robot = AgxArmFactory.create_arm(cfg)
+robot.connect()
+
+if not robot.is_connected():
+    try:
+        robot.reconnect()
+    except Exception as exc:
+        print("Comm issue:", exc)
+        time.sleep(1.0)
 ```
 
 ---
@@ -2744,6 +2784,7 @@ print("disable periodic feedback success =", success)
   - [探测可用 CAN 配置 — AgxArmFactory.detect_can_configs()](#探测可用-can-配置--agxarmfactorydetect_can_configs)
   - [创建连接 — connect()](#创建连接--connect)
   - [断开连接 — disconnect()](#断开连接--disconnect)
+  - [重连 — reconnect()](#重连--reconnect)
   - [初始化末端执行器 — init_effector()](#初始化末端执行器--init_effector)
 - [通用状态](#通用状态)
   - [获取关节数量 — joint_nums](#获取关节数量--joint_nums)
@@ -3137,6 +3178,45 @@ print(robot.is_connected())
 
 robot.disconnect()
 print(robot.is_connected())
+```
+
+---
+
+### 重连 — `reconnect()`
+
+**功能说明：** 显式重建当前通信会话：先执行断连清理，再重新建立连接。
+
+该接口适用于 CAN 通信瞬时异常恢复，或 USB-CAN 设备重插后的连接重建场景。
+
+**函数定义：**
+
+```python
+reconnect(self, join_timeout: float = 1.0, start_read_thread: bool = True) -> None
+```
+
+**参数说明：**
+
+| 名称 | 类型 | 说明 |
+| --- | --- | --- |
+| `join_timeout` | `float` | 断连阶段等待旧线程/资源退出的超时时间（秒），默认 `1.0` |
+| `start_read_thread` | `bool` | 重连后是否启动数据读取线程，默认 `True` |
+
+**使用示例：**
+
+```python
+import time
+from pyAgxArm import create_agx_arm_config, AgxArmFactory, ArmModel, PiperFW
+
+cfg = create_agx_arm_config(robot=ArmModel.PIPER, firmeware_version=PiperFW.DEFAULT, channel="can0")
+robot = AgxArmFactory.create_arm(cfg)
+robot.connect()
+
+if not robot.is_connected():
+    try:
+        robot.reconnect()
+    except Exception as exc:
+        print("通信异常:", exc)
+        time.sleep(1.0)
 ```
 
 ---
