@@ -48,7 +48,13 @@ pip3 install python-can
 
 `python-can` should be newer than `3.3.4`.
 
-If you want to use this SDK on Windows, you must install the `python-can-agx-cando` plugin and use the `agx_cando` interface:
+If you want to use this SDK on Windows, you must install the `python-can-agx-cando` plugin and use the `agx_cando` interface. The recommended way is:
+
+```shell
+pip3 install "git+https://github.com/agilexrobotics/python-can-agx-cando.git"
+```
+
+You can also clone the repository and install it locally:
 
 ```shell
 git clone https://github.com/agilexrobotics/python-can-agx-cando.git
@@ -56,7 +62,13 @@ cd python-can-agx-cando
 pip3 install .
 ```
 
-Then install `pyAgxArm`:
+Then install `pyAgxArm`. The recommended way is to install directly from GitHub:
+
+```shell
+pip3 install "git+https://github.com/agilexrobotics/pyAgxArm.git"
+```
+
+You can also clone the repository and install it locally:
 
 ```shell
 git clone https://github.com/agilexrobotics/pyAgxArm.git
@@ -187,7 +199,13 @@ pip3 install python-can
 
 `python-can` 版本应高于 `3.3.4`。
 
-如果你想在 Windows 上使用本 SDK，必须先安装 `python-can-agx-cando` 插件，并使用 `agx_cando` 接口：
+如果你想在 Windows 上使用本 SDK，必须先安装 `python-can-agx-cando` 插件，并使用 `agx_cando` 接口。推荐直接安装：
+
+```shell
+pip3 install "git+https://github.com/agilexrobotics/python-can-agx-cando.git"
+```
+
+也可以克隆源码后在本地安装：
 
 ```shell
 git clone https://github.com/agilexrobotics/python-can-agx-cando.git
@@ -195,7 +213,13 @@ cd python-can-agx-cando
 pip3 install .
 ```
 
-然后再安装 `pyAgxArm`：
+然后再安装 `pyAgxArm`。推荐直接通过 GitHub 安装：
+
+```shell
+pip3 install "git+https://github.com/agilexrobotics/pyAgxArm.git"
+```
+
+也可以克隆源码后在本地安装：
 
 ```shell
 git clone https://github.com/agilexrobotics/pyAgxArm.git
