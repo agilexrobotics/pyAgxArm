@@ -5,18 +5,23 @@ from ..protocols.can_protocol.drivers import (
     NeroDriverDefault,
     NeroDriverV111,
     NeroDriverV112,
+    NeroDriverV120,
     PiperDriverDefault,
     PiperDriverV183,
     PiperDriverV188,
+    PiperDriverV189,
     PiperHDriverDefault,
     PiperHDriverV183,
     PiperHDriverV188,
+    PiperHDriverV189,
     PiperLDriverDefault,
     PiperLDriverV183,
     PiperLDriverV188,
+    PiperLDriverV189,
     PiperXDriverDefault,
     PiperXDriverV183,
     PiperXDriverV188,
+    PiperXDriverV189,
 )
 
 # ---------- Phantom config types ----------
@@ -27,12 +32,16 @@ class NeroCanV111Config():
     pass
 class NeroCanV112Config():
     pass
+class NeroCanV120Config():
+    pass
 
 class PiperCanDefaultConfig():
     pass
 class PiperCanV183Config():
     pass
 class PiperCanV188Config():
+    pass
+class PiperCanV189Config():
     pass
 
 class PiperHCanDefaultConfig():
@@ -41,6 +50,8 @@ class PiperHCanV183Config():
     pass
 class PiperHCanV188Config():
     pass
+class PiperHCanV189Config():
+    pass
 
 class PiperLCanDefaultConfig():
     pass
@@ -48,12 +59,16 @@ class PiperLCanV183Config():
     pass
 class PiperLCanV188Config():
     pass
+class PiperLCanV189Config():
+    pass
 
 class PiperXCanDefaultConfig():
     pass
 class PiperXCanV183Config():
     pass
 class PiperXCanV188Config():
+    pass
+class PiperXCanV189Config():
     pass
 
 # ---------- create_agx_arm_config overloads ----------
@@ -84,6 +99,14 @@ def create_agx_arm_config(
     **kwargs: Any
 ) -> NeroCanV112Config: ...
 
+@overload
+def create_agx_arm_config(
+    robot: Literal["nero"],
+    comm: Literal["can"] = ...,
+    firmeware_version: Literal["v120"] = ...,
+    **kwargs: Any
+) -> NeroCanV120Config: ...
+
 # --- piper ---
 
 @overload
@@ -109,6 +132,14 @@ def create_agx_arm_config(
     firmeware_version: Literal["v188"] = ...,
     **kwargs: Any
 ) -> PiperCanV188Config: ...
+
+@overload
+def create_agx_arm_config(
+    robot: Literal["piper"],
+    comm: Literal["can"] = ...,
+    firmeware_version: Literal["v189"] = ...,
+    **kwargs: Any
+) -> PiperCanV189Config: ...
 
 # --- piper_h ---
 
@@ -136,6 +167,14 @@ def create_agx_arm_config(
     **kwargs: Any
 ) -> PiperHCanV188Config: ...
 
+@overload
+def create_agx_arm_config(
+    robot: Literal["piper_h"],
+    comm: Literal["can"] = ...,
+    firmeware_version: Literal["v189"] = ...,
+    **kwargs: Any
+) -> PiperHCanV189Config: ...
+
 # --- piper_l ---
 
 @overload
@@ -162,6 +201,14 @@ def create_agx_arm_config(
     **kwargs: Any
 ) -> PiperLCanV188Config: ...
 
+@overload
+def create_agx_arm_config(
+    robot: Literal["piper_l"],
+    comm: Literal["can"] = ...,
+    firmeware_version: Literal["v189"] = ...,
+    **kwargs: Any
+) -> PiperLCanV189Config: ...
+
 # --- piper_x ---
 
 @overload
@@ -187,6 +234,14 @@ def create_agx_arm_config(
     firmeware_version: Literal["v188"] = ...,
     **kwargs: Any
 ) -> PiperXCanV188Config: ...
+
+@overload
+def create_agx_arm_config(
+    robot: Literal["piper_x"],
+    comm: Literal["can"] = ...,
+    firmeware_version: Literal["v189"] = ...,
+    **kwargs: Any
+) -> PiperXCanV189Config: ...
 
 # ---------- AgxArmFactory ----------
 
@@ -244,7 +299,13 @@ class AgxArmFactory:
     @classmethod
     @overload
     def create_arm(cls, config: NeroCanV112Config, **kwargs) -> NeroDriverV112:
-        """Nero CAN driver for firmware >= v112."""
+        """Nero CAN driver for firmware 1.12."""
+        ...
+
+    @classmethod
+    @overload
+    def create_arm(cls, config: NeroCanV120Config, **kwargs) -> NeroDriverV120:
+        """Nero CAN driver for firmware >= v120 (1.20)."""
         ...
 
     # --- piper ---
@@ -289,7 +350,13 @@ class AgxArmFactory:
     @classmethod
     @overload
     def create_arm(cls, config: PiperCanV188Config, **kwargs) -> PiperDriverV188:
-        """Piper CAN driver for firmware >= v188 (S-V1.8-8)."""
+        """Piper CAN driver for firmware == v188 (S-V1.8-8)."""
+        ...
+
+    @classmethod
+    @overload
+    def create_arm(cls, config: PiperCanV189Config, **kwargs) -> PiperDriverV189:
+        """Piper CAN driver for firmware >= v189 (S-V1.8-9)."""
         ...
 
     # --- piper_h ---
@@ -334,7 +401,13 @@ class AgxArmFactory:
     @classmethod
     @overload
     def create_arm(cls, config: PiperHCanV188Config, **kwargs) -> PiperHDriverV188:
-        """PiperH CAN driver for firmware >= v188 (S-V1.8-8)."""
+        """PiperH CAN driver for firmware == v188 (S-V1.8-8)."""
+        ...
+
+    @classmethod
+    @overload
+    def create_arm(cls, config: PiperHCanV189Config, **kwargs) -> PiperHDriverV189:
+        """PiperH CAN driver for firmware >= v189 (S-V1.8-9)."""
         ...
 
     # --- piper_l ---
@@ -379,7 +452,13 @@ class AgxArmFactory:
     @classmethod
     @overload
     def create_arm(cls, config: PiperLCanV188Config, **kwargs) -> PiperLDriverV188:
-        """PiperL CAN driver for firmware >= v188 (S-V1.8-8)."""
+        """PiperL CAN driver for firmware == v188 (S-V1.8-8)."""
+        ...
+
+    @classmethod
+    @overload
+    def create_arm(cls, config: PiperLCanV189Config, **kwargs) -> PiperLDriverV189:
+        """PiperL CAN driver for firmware >= v189 (S-V1.8-9)."""
         ...
 
     # --- piper_x ---
@@ -424,5 +503,11 @@ class AgxArmFactory:
     @classmethod
     @overload
     def create_arm(cls, config: PiperXCanV188Config, **kwargs) -> PiperXDriverV188:
-        """PiperX CAN driver for firmware >= v188 (S-V1.8-8)."""
+        """PiperX CAN driver for firmware == v188 (S-V1.8-8)."""
+        ...
+
+    @classmethod
+    @overload
+    def create_arm(cls, config: PiperXCanV189Config, **kwargs) -> PiperXDriverV189:
+        """PiperX CAN driver for firmware >= v189 (S-V1.8-9)."""
         ...

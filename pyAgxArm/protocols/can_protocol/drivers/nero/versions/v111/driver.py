@@ -185,6 +185,7 @@ class Driver(DefaultDriver):
         if motor_state is not None:
             motor_state.hz = self._ctx.fps.get_fps(motor_state.msg_type)
             # TODO: remove this after the bug is fixed
+            # corrected in version 1.20
             motor_state.msg.velocity = 0.0
             return motor_state
         else:

@@ -21,7 +21,7 @@ from .parser import (
 
 
 class Driver(V111Driver):
-    """Nero CAN driver for firmware >= v112 (1.12).
+    """Nero CAN driver for firmware == v112 (1.12).
 
     Terminology
     -----------
@@ -660,6 +660,7 @@ class Driver(V111Driver):
         )
 
         # TODO: remove this after the bug is fixed
+        # corrected in version 1.20
         if joint_index != 6:
             vel *= -1
 

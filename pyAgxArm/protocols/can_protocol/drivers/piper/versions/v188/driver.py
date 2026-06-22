@@ -11,7 +11,7 @@ from .parser import Parser, PiperV188DriverAPIProtoAdapter
 
 
 class Driver(V183Driver):
-    """Piper CAN driver for firmware >= v188 (S-V1.8-8).
+    """Piper CAN driver for firmware == v188 (S-V1.8-8).
 
     Terminology
     -----------

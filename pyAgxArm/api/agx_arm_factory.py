@@ -8,18 +8,23 @@ from ..protocols.can_protocol.drivers import (
     NeroDriverDefault,
     NeroDriverV111,
     NeroDriverV112,
+    NeroDriverV120,
     PiperDriverDefault,
     PiperDriverV183,
     PiperDriverV188,
+    PiperDriverV189,
     PiperHDriverDefault,
     PiperHDriverV183,
     PiperHDriverV188,
+    PiperHDriverV189,
     PiperLDriverDefault,
     PiperLDriverV183,
     PiperLDriverV188,
+    PiperLDriverV189,
     PiperXDriverDefault,
     PiperXDriverV183,
     PiperXDriverV188,
+    PiperXDriverV189,
 )
 
 
@@ -59,16 +64,19 @@ def create_agx_arm_config(
             from pyAgxArm import PiperFW
             PiperFW.DEFAULT  # firmware ≤ S-V1.8-2
             PiperFW.V183     # firmware S-V1.8-3 ~ S-V1.8-7
-            PiperFW.V188     # firmware ≥ S-V1.8-8
+            PiperFW.V188     # firmware = S-V1.8-8
+            PiperFW.V189     # firmware ≥ S-V1.8-9
 
         **Nero series** — ``NeroFW``::
 
             from pyAgxArm import NeroFW
             NeroFW.DEFAULT   # firmware ≤ 1.10
             NeroFW.V111      # firmware = 1.11
-            NeroFW.V112      # firmware ≥ 1.12
+            NeroFW.V112      # firmware 1.12
+            NeroFW.V120      # firmware ≥ 1.20
 
-        Raw strings (``"default"`` / ``"v183"`` / ``"v188"`` / ``"v111"`` / ``"v112"``) are also accepted.
+        String literals equal to ``PiperFW`` / ``NeroFW`` member values are also
+        accepted (backward-compatible; see ``arm_options.py`` for the full list).
 
     **kwargs
         Additional keyword arguments forwarded to the comm layer
@@ -138,6 +146,7 @@ class AgxArmFactory:
                 "default": PiperDriverDefault,
                 "v183": PiperDriverV183,
                 "v188": PiperDriverV188,
+                "v189": PiperDriverV189,
             },
         },
         "nero": {
@@ -145,6 +154,7 @@ class AgxArmFactory:
                 "default": NeroDriverDefault,
                 "v111": NeroDriverV111,
                 "v112": NeroDriverV112,
+                "v120": NeroDriverV120,
             },
         },
         "piper_h": {
@@ -152,6 +162,7 @@ class AgxArmFactory:
                 "default": PiperHDriverDefault,
                 "v183": PiperHDriverV183,
                 "v188": PiperHDriverV188,
+                "v189": PiperHDriverV189,
             },
         },
         "piper_l": {
@@ -159,6 +170,7 @@ class AgxArmFactory:
                 "default": PiperLDriverDefault,
                 "v183": PiperLDriverV183,
                 "v188": PiperLDriverV188,
+                "v189": PiperLDriverV189,
             },
         },
         "piper_x": {
@@ -166,6 +178,7 @@ class AgxArmFactory:
                 "default": PiperXDriverDefault,
                 "v183": PiperXDriverV183,
                 "v188": PiperXDriverV188,
+                "v189": PiperXDriverV189,
             },
         },
     }
@@ -186,8 +199,8 @@ class AgxArmFactory:
         robot   : piper / nero / piper_h / piper_l / piper_x
         comm    : can
         firmeware_version :
-            Piper 系列: default / v183 / v188
-            Nero 系列 : default / v111 / v112
+            Piper 系列: default / v183 / v188 / v189
+            Nero 系列 : default / v111 / v112 / v120
         """
         cls._registry.setdefault(robot, {})
         cls._registry[robot].setdefault(comm, {})

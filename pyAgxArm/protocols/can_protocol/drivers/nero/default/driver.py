@@ -103,7 +103,7 @@ class Driver(ArmDriverAbstract):
     def _deal_move_p_msgs(self, pose: List[float]):
         """Get pose control messages."""
         # TODO: remove this after the bug is fixed
-        # Correcting incorrect postures in version 1.10
+        # corrected in version 1.10
         if len(pose) == 6:
             pose[3] *= -1
             pose[4] *= -1
@@ -296,7 +296,7 @@ class Driver(ArmDriverAbstract):
             end_pose = self._parser.end_pose_zrx
             self._end_pose.msg[2] = end_pose.msg.Z_axis
             # TODO: Restore direct assignment after bug fix.
-            # Correcting incorrect postures in version 1.10
+            # corrected in version 1.10
             self._end_pose.msg[3] = -end_pose.msg.RX_axis
         if getattr(self._parser, "end_pose_ryrz", None) is not None:
             end_pose = self._parser.end_pose_ryrz
@@ -537,7 +537,9 @@ class Driver(ArmDriverAbstract):
         if motor_state is not None:
             motor_state.hz = self._ctx.fps.get_fps(motor_state.msg_type)
             # TODO: remove this after the bug is fixed
+            # corrected in version 1.20
             motor_state.msg.velocity = 0.0
+            # corrected in version 1.11
             motor_state.msg.current *= -1
             return motor_state
         else:

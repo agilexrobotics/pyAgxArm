@@ -53,7 +53,9 @@ while robot.get_firmware() is None:
 
 sv = robot.get_firmware()["software_version"]
 fw = PiperFW.DEFAULT
-if sv >= "S-V1.8-8":
+if sv >= "S-V1.8-9":
+    fw = PiperFW.V189
+elif sv >= "S-V1.8-8":
     fw = PiperFW.V188
 elif sv >= "S-V1.8-3":
     fw = PiperFW.V183

@@ -27,7 +27,8 @@ class PiperFW:
     ======== ========================
     DEFAULT  <= S-V1.8-2
     V183     S-V1.8-3 ~ S-V1.8-7
-    V188     >= S-V1.8-8
+    V188     S-V1.8-8
+    V189     >= S-V1.8-9
     ======== ========================
 
     Use::
@@ -39,6 +40,7 @@ class PiperFW:
     DEFAULT: Final[Literal["default"]] = "default"
     V183: Final[Literal["v183"]] = "v183"
     V188: Final[Literal["v188"]] = "v188"
+    V189: Final[Literal["v189"]] = "v189"
 
 
 class NeroFW:
@@ -48,8 +50,9 @@ class NeroFW:
     Constant Firmware range
     ======== ========================
     DEFAULT  <= 1.10
-    V111     == 1.11
-    V112     >= 1.12
+    V111     1.11
+    V112     1.12
+    V120     >= 1.20
     ======== ========================
 
     Use::
@@ -61,3 +64,4 @@ class NeroFW:
     DEFAULT: Final[Literal["default"]] = "default"
     V111: Final[Literal["v111"]] = "v111"
     V112: Final[Literal["v112"]] = "v112"
+    V120: Final[Literal["v120"]] = "v120"

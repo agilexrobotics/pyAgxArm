@@ -26,9 +26,13 @@
 - CAN-to-USB module (with Type-C to USB-A cable)
 - Ubuntu PC (with USB-A port)
 
-> Pick the block for your firmware (`get_firmware()` or web UI). **≥ 1.12 (`NeroFW.V112`):** CAN feedback starts at power-up — no web CAN-push toggle or `set_normal_mode()`.
+> Pick the block for your firmware (`get_firmware()` or web UI). **≥ 1.12 (`NeroFW.V112` / `NeroFW.V120`):** CAN feedback starts at power-up — no web CAN-push toggle or `set_normal_mode()`.
 
-### Firmware ≥ 1.12 (`NeroFW.V112`)
+### Firmware ≥ 1.20 (`NeroFW.V120`)
+
+Same connect flow as V112; use `NeroFW.V120` when firmware is **1.20 or later**.
+
+### Firmware 1.12 (`NeroFW.V112`)
 
 1. Connect USB-to-CAN to Nero CAN (H/L), activate `can0` on PC (see [can_user](../can_user.md#can-module-manual)).
 2. Power on the arm; wait for green indicator.
@@ -82,7 +86,8 @@ while not robot.enable():
 
 | Firmware | Get CAN data on bus |
 |---|---|
-| ≥ 1.12 | Power on → `connect()` → `enable()` |
+| ≥ 1.20 | Power on → `connect()` → `enable()` (`NeroFW.V120`) |
+| 1.12 | Power on → `connect()` → `enable()` (`NeroFW.V112`) |
 | ≤ 1.11 | Web UI CAN push **or** `set_normal_mode()` while enabling |
 
 Example `candump can0` stream:
@@ -158,9 +163,13 @@ while True:
 - CAN 转 USB 模块（带 Type-C 转 USB-A 线材）
 - Ubuntu 系统 PC 一台（需要有 USB-A 接口）
 
-> 按固件选择下列流程（`get_firmware()` 或上位机查看）。**≥ 1.12（`NeroFW.V112`）：** 上电即 CAN 推送，无需网页开关或 `set_normal_mode()`。
+> 按固件选择下列流程（`get_firmware()` 或上位机查看）。**≥ 1.12（`NeroFW.V112` / `NeroFW.V120`）：** 上电即 CAN 推送，无需网页开关或 `set_normal_mode()`。
 
-### 固件 ≥ 1.12（`NeroFW.V112`）
+### 固件 ≥ 1.20（`NeroFW.V120`）
+
+连接流程与 V112 相同；固件 **≥ 1.20** 时使用 `NeroFW.V120`。
+
+### 固件 1.12（`NeroFW.V112`）
 
 1. USB 转 CAN 接 H/L，PC 激活 `can0`（见 [can_user](../can_user.md#can-模块使用手册)）。
 2. 机械臂上电，待绿灯。
@@ -213,7 +222,8 @@ while not robot.enable():
 
 | 固件 | 总线上有 CAN 数据 |
 |---|---|
-| ≥ 1.12 | 上电 → `connect()` → `enable()` |
+| ≥ 1.20 | 上电 → `connect()` → `enable()`（`NeroFW.V120`） |
+| 1.12 | 上电 → `connect()` → `enable()`（`NeroFW.V112`） |
 | ≤ 1.11 | 网页 CAN 推送 **或** 使能时 `set_normal_mode()` |
 
 正常 `candump can0` 数据流：

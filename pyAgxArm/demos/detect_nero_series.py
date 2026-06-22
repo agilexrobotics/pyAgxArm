@@ -53,7 +53,9 @@ while robot.get_firmware() is None:
 
 sv = robot.get_firmware()["software_version"]
 fw = NeroFW.DEFAULT
-if sv >= "1.12":
+if sv >= "1.20":
+    fw = NeroFW.V120
+elif sv >= "1.12":
     fw = NeroFW.V112
 elif sv >= "1.11":
     fw = NeroFW.V111

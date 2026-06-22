@@ -104,7 +104,8 @@ Check the arm firmware with [get_firmware()](#get-firmware-info--get_firmware) (
 
 | Your firmware | `firmeware_version` | Constant |
 | --- | --- | --- |
-| S-V1.8-8 or later | `"v188"` | `PiperFW.V188` |
+| S-V1.8-9 or later | `"v189"` | `PiperFW.V189` |
+| S-V1.8-8 | `"v188"` | `PiperFW.V188` |
 | S-V1.8-3 ~ S-V1.8-7 | `"v183"` | `PiperFW.V183` |
 | S-V1.8-2 or earlier | `"default"` (or omit) | `PiperFW.DEFAULT` |
 
@@ -152,7 +153,7 @@ create_agx_arm_config(
 | --- | --- | --- |
 | `robot` | `str` | Robotic arm model. Use `ArmModel` constants: `ArmModel.PIPER` / `ArmModel.PIPER_H` / `ArmModel.PIPER_L` / `ArmModel.PIPER_X` / `ArmModel.NERO` (raw strings `"piper"` etc. also accepted) |
 | `comm` | `str` | Communication type. Options: `"can"` (default). Note: `comm` is not the CAN channel name; the CAN channel is specified by `channel` |
-| `firmeware_version` | `str` | Main controller firmware version. Use per-robot constants: Piper series → `PiperFW.DEFAULT` / `PiperFW.V183` / `PiperFW.V188`. See [Firmware Version](#firmware-version) for details. Default `"default"` |
+| `firmeware_version` | `str` | Main controller firmware version. Use per-robot constants: Piper series → `PiperFW.DEFAULT` / `PiperFW.V183` / `PiperFW.V188` / `PiperFW.V189`. See [Firmware Version](#firmware-version) for details. Default `"default"` |
 
 **Optional Keyword Arguments (`**kwargs`):**
 
@@ -2826,7 +2827,8 @@ Piper 与 Nero 固件体系相互独立。SDK 通过 `create_agx_arm_config()` �
 
 | 固件版本 | `firmeware_version` | 常量 |
 | --- | --- | --- |
-| S-V1.8-8 及更新 | `"v188"` | `PiperFW.V188` |
+| S-V1.8-9 及更新 | `"v189"` | `PiperFW.V189` |
+| S-V1.8-8 | `"v188"` | `PiperFW.V188` |
 | S-V1.8-3 ~ S-V1.8-7 | `"v183"` | `PiperFW.V183` |
 | S-V1.8-2 及更早 | `"default"`（或不填） | `PiperFW.DEFAULT` |
 
@@ -2874,7 +2876,7 @@ create_agx_arm_config(
 | --- | --- | --- |
 | `robot` | `str` | 机械臂型号。推荐使用 `ArmModel` 常量：`ArmModel.PIPER` / `ArmModel.PIPER_H` / `ArmModel.PIPER_L` / `ArmModel.PIPER_X` / `ArmModel.NERO`（也兼容原始字符串 `"piper"` 等） |
 | `comm` | `str` | 通讯类型，可选值：`"can"`（默认）。注意：`comm` 不是 CAN 通道名，CAN 通道由 `channel` 指定 |
-| `firmeware_version` | `str` | 主控固件版本。推荐使用按机型分类的常量：Piper 系列 → `PiperFW.DEFAULT` / `PiperFW.V183` / `PiperFW.V188`。选择方法见[固件版本选择](#固件版本选择)。默认 `"default"` |
+| `firmeware_version` | `str` | 主控固件版本。推荐使用按机型分类的常量：Piper 系列 → `PiperFW.DEFAULT` / `PiperFW.V183` / `PiperFW.V188` / `PiperFW.V189`。选择方法见[固件版本选择](#固件版本选择)。默认 `"default"` |
 
 **可选关键字参数（`**kwargs`）：**
 
