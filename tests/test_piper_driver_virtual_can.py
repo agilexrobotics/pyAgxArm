@@ -1,3 +1,5 @@
+import time
+
 import pytest
 
 from pyAgxArm import AgxArmFactory, ArmModel, PiperFW, create_agx_arm_config
@@ -262,6 +264,45 @@ def test_piper_driver_virtual_can_cpv_invalid_joint_and_timeout():
 
         device._cpv_reply_enabled = False
         assert arm.get_cpv_pos(1, timeout=0.05, min_interval=0.0) is None
+        arm.disconnect()
+    finally:
+        device.stop()
+
+
+def test_piper_driver_virtual_can_mode_ctrl_duplicate_throttle():
+    channel = new_virtual_channel("ci_piper_mode_throttle")
+    device = PiperCanSlave(channel=channel)
+    device.start()
+    try:
+        arm = _make_piper_arm(PiperFW.DEFAULT, channel)
+        arm.connect()
+
+        arm.set_motion_mode(arm.OPTIONS.MOTION_MODE.CPV)
+        arm.set_motion_mode(arm.OPTIONS.MOTION_MODE.CPV)
+        assert wait_until(
+            lambda: any(f.arbitration_id == 0x151 for f in device.host_frames),
+            timeout=1.0,
+        )
+        host_151 = [f for f in device.host_frames if f.arbitration_id == 0x151]
+        assert len(host_151) == 1
+
+        arm.set_motion_mode(arm.OPTIONS.MOTION_MODE.J)
+        assert wait_until(
+            lambda: len([f for f in device.host_frames if f.arbitration_id == 0x151]) >= 2,
+            timeout=1.0,
+        )
+        host_151 = [f for f in device.host_frames if f.arbitration_id == 0x151]
+        assert len(host_151) == 2
+        assert len(host_151[-1].data) >= 2 and host_151[-1].data[1] == 0x01
+
+        time.sleep(0.11)  # > 0x151 default repeat interval (100ms)
+        arm.set_motion_mode(arm.OPTIONS.MOTION_MODE.J)
+        assert wait_until(
+            lambda: len([f for f in device.host_frames if f.arbitration_id == 0x151]) >= 3,
+            timeout=1.0,
+        )
+        host_151 = [f for f in device.host_frames if f.arbitration_id == 0x151]
+        assert len(host_151) == 3
         arm.disconnect()
     finally:
         device.stop()

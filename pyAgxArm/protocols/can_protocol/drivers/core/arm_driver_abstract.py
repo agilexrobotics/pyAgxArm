@@ -82,6 +82,8 @@ class ArmDriverAbstract(ArmDriverInterface):
                         "Robot is not connected (comm is None). "
                         "Call `connect()` before sending commands."
                     )
+                if not self._ctx.should_send_tx_frame(data):
+                    return
                 try:
                     comm.send(data)
                 except Exception as exc:

@@ -1,6 +1,8 @@
 import time
 import threading
 from typing import Callable, TypeVar, Optional, Dict
+
+import can
 from ...comms import CommsFactory, create_comm_config
 from .....utiles.fps import FPSManager
 
@@ -29,6 +31,12 @@ class DriverContext:
         # Stamp dictionary for request throttling (used by _request_and_get).
         # Key is an arbitrary string (e.g. "firmware", "joint_acc:3").
         self._req_stamp: Dict[str, float] = {}
+        self._tx_repeat_lock = threading.Lock()
+        self._tx_repeat_min_interval: Dict[int, float] = {
+            0x151: 0.1,
+        }
+        self._tx_last_payload: Dict[int, bytes] = {}
+        self._tx_last_stamp: Dict[int, float] = {}
 
     def has_comm_error(self) -> bool:
         return bool(self.comm is not None and getattr(self.comm, "last_error", None) is not None)
@@ -197,6 +205,9 @@ class DriverContext:
             self.comm = None
             self._comm_initialized = False
         self._req_stamp.clear()
+        with self._tx_repeat_lock:
+            self._tx_last_payload.clear()
+            self._tx_last_stamp.clear()
 
     def _read_loop(self):
         while not self._read_stop_event.is_set():
@@ -295,3 +306,32 @@ class DriverContext:
             clear()
         self._req_stamp[stamp_attr] = 0.0
         return value
+
+    # -------------------------
+    # TX repeat-frame throttling
+    # -------------------------
+    def set_tx_repeat_min_interval(self, can_id: int, min_interval: float) -> None:
+        """Set the minimum resend interval for identical frames on a CAN ID."""
+        self._validate_min_interval(min_interval)
+        with self._tx_repeat_lock:
+            if min_interval == 0.0:
+                self._tx_repeat_min_interval.pop(can_id, None)
+            else:
+                self._tx_repeat_min_interval[can_id] = min_interval
+
+    def should_send_tx_frame(self, frame: can.Message) -> bool:
+        """Return whether a TX frame should be sent after duplicate throttling."""
+        min_interval = self._tx_repeat_min_interval.get(frame.arbitration_id, 0.0)
+        if min_interval <= 0.0:
+            return True
+
+        payload = bytes(frame.data)
+        now = time.monotonic()
+        with self._tx_repeat_lock:
+            last_payload = self._tx_last_payload.get(frame.arbitration_id)
+            last_stamp = self._tx_last_stamp.get(frame.arbitration_id, 0.0)
+            if last_payload == payload and now - last_stamp < min_interval:
+                return False
+            self._tx_last_payload[frame.arbitration_id] = payload
+            self._tx_last_stamp[frame.arbitration_id] = now
+            return True
