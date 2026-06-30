@@ -1,3 +1,5 @@
+import can
+
 from typing import TYPE_CHECKING, Callable, Optional, List, Dict, Tuple, Type
 
 from typing_extensions import Final, Literal
@@ -99,6 +101,7 @@ class Codec:
         motor_state.position = (
             nc.ConvertToNegative_32bit(nc.ConvertBytesToInt(can_data, 4, 8)) * 1e-3
         )
+        motor_state.torque = motor_state.current
 
     def decode_low_spd(self, driver_state: ArmMsgFeedbackLowSpd, can_data: bytearray) -> None:
         """低速反馈通用解码：写入 vol/foc_temp/motor_temp/foc_status_code/bus_current"""
@@ -652,11 +655,37 @@ class Parser(TableDriven, ProtocolParserInterface):
         cpv_response_5: Optional[MessageAbstract[ArmMsgFeedbackCPVResponse5]]
         cpv_response_6: Optional[MessageAbstract[ArmMsgFeedbackCPVResponse6]]
 
-    def __init__(self, fps_manager: FPSManager, codec: Optional[Codec] = None):
+    def __init__(
+        self,
+        fps_manager: FPSManager,
+        codec: Optional[Codec] = None,
+        config: Optional[dict] = None,
+    ):
         super().__init__(fps_manager=fps_manager)
-        self._codec = codec or Codec()        
+        self._codec = codec or Codec()
+        self._config = config
         self._rx_map = self._build_rx_map()
         self._tx_map = self._build_tx_map()
+
+    # Add torque calculation to motor state messages
+    def parse_packet(self, rx_can_frame: can.Message) -> Optional[MessageAbstract]:
+        spec = self._rx_map.get(rx_can_frame.arbitration_id)
+        attr_name = spec[0] if spec is not None else None
+        cached = super().parse_packet(rx_can_frame)
+        if (
+            cached is not None
+            and attr_name
+            and attr_name.startswith("motor_state_")
+            and isinstance(cached.msg, ArmMsgFeedbackHighSpd)
+            and self._config
+        ):
+            k_table = self._config.get("joint_torque_k")
+            b_table = self._config.get("joint_torque_b")
+            if k_table and b_table:
+                idx = int(attr_name.rsplit("_", 1)[-1]) - 1
+                if 0 <= idx < len(k_table) and idx < len(b_table):
+                    cached.msg.torque *= k_table[idx] * b_table[idx]
+        return cached
 
     # -------------------------
     # Driver-side message builders (internal helpers)

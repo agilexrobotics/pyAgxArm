@@ -152,9 +152,13 @@ class Parser(PiperParser):
         leader_joint_6: Optional[MessageAbstract[ArmMsgFeedbackLeaderJointStates6]]
         leader_joint_7: Optional[MessageAbstract[ArmMsgFeedbackLeaderJointStates7]]
 
-    def __init__(self, fps_manager: FPSManager, codec: Optional[Codec] = None):
-        # Reuse Piper Parser init; only replace codec with Nero version.
-        super().__init__(fps_manager=fps_manager, codec=codec or Codec())
+    def __init__(
+        self,
+        fps_manager: FPSManager,
+        codec: Optional[Codec] = None,
+        config: Optional[dict] = None,
+    ):
+        super().__init__(fps_manager=fps_manager, codec=codec or Codec(), config=config)
         self._codec = codec or Codec()
 
     def _build_rx_map(

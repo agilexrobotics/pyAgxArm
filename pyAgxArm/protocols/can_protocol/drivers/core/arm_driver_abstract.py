@@ -50,7 +50,7 @@ class ArmDriverAbstract(ArmDriverInterface):
         self._connected = False
         self._effector_kind: Optional[str] = None
         self._effector = None
-        self._parser = self._Parser(self._ctx.fps)
+        self._parser = self._Parser(self._ctx.fps, config=self._config)
         self._arm_ctx = ArmDriverContext(config, self._ctx, self._parser)
         self._auto_set_motion_mode_enabled = True
         self._joint_limits_enabled = False

@@ -1190,6 +1190,8 @@ class Driver(ArmDriverAbstract):
             (Numerical precision: 2.509803921568627e-1 N·m)
           Joint 4-6: Range [-8.0, 8.0].
             (Numerical precision: 6.274509803921569e-2 N·m)
+          `piper_h` / `piper_l` / `piper_x`: per-joint `t_ff` limit ±(8×b)
+            (b from config `joint_torque_b`).
 
         Raises
         ------
@@ -1257,12 +1259,10 @@ class Driver(ArmDriverAbstract):
             )
             kd = Validator.clamp(kd, -5.0, 5.0)
 
-        if joint_index in (1, 2, 3):
-            t_ff_min = -32.0
-            t_ff_max = 32.0
-        else:
-            t_ff_min = -8.0
-            t_ff_max = 8.0
+        b = self._config.get("joint_torque_b")[joint_index - 1]
+        t_ff_limit = 8.0 * b
+        t_ff_min = -t_ff_limit
+        t_ff_max = t_ff_limit
 
         if not Validator.is_within_limit(t_ff, t_ff_min, t_ff_max):
             print(
@@ -1270,9 +1270,8 @@ class Driver(ArmDriverAbstract):
                 f"joint {joint_index} limits [{t_ff_min}, {t_ff_max}]. "
             )
             t_ff = Validator.clamp(t_ff, t_ff_min, t_ff_max)
-        
-        if joint_index in (1, 2, 3):
-            t_ff *= 0.25
+
+        t_ff /= b
 
         p_des = nc.FloatToUint(p_des, -12.5, 12.5, 16)
         v_des = nc.FloatToUint(v_des, -45.0, 45.0, 12)

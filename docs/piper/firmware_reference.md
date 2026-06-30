@@ -75,6 +75,8 @@ All other public APIs in [piper_api.md](piper_api.md#piper-api-documentation) ar
 
 Precision (N·m): `DEFAULT` 1–3 ≈ 2.51e-1, 4–6 ≈ 6.28e-2; `V183` all ≈ 6.28e-2; `V188` all ≈ 7.81e-3.
 
+> **`piper_h` / `piper_l` / `piper_x` @ `DEFAULT`:** per-joint `t_ff` clamp ±(8×bᵢ) N·m (`bᵢ` = `joint_torque_b` in config; see `pyAgxArm.api.constants`).
+
 ---
 
 ## API Availability Matrix (full)
@@ -211,6 +213,8 @@ Legend: **✅** supported · **⚠️** supported with version-specific behavior
 | `V188` | 1–6 | ±16 | — | **12-bit** | 8 字节；**无 CRC**（第 6–7 字节为 `t_ff`） |
 
 精度（N·m）：`DEFAULT` 1–3 ≈ 2.51e-1，4–6 ≈ 6.28e-2；`V183` 全关节 ≈ 6.28e-2；`V188` 全关节 ≈ 7.81e-3。
+
+> **`piper_h` / `piper_l` / `piper_x` @ `DEFAULT`：** 各关节 `t_ff` 限幅 ±(8×bᵢ) N·m（`bᵢ` 为 config 中 `joint_torque_b`；见 `pyAgxArm.api.constants`）。
 
 ---
 

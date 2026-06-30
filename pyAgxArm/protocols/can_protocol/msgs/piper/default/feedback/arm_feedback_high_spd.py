@@ -61,30 +61,18 @@ class ArmMsgFeedbackHighSpd(AttributeBase):
         Byte 6: Motor Position (Second Least Significant Byte)
         Byte 7: Motor Position (Least Significant Byte)
     '''
-    _derived_fields_ = ("torque",)
-    _COEFFICIENT_1 = 1.18125 * 4.0
-    _COEFFICIENT_2 = 0.95844
     _VALID_CAN_ID = 0x000
-    _VALID_CAN_ID_1 = [0x251, 0x252, 0x253]
-    _VALID_CAN_ID_2 = [0x254, 0x255, 0x256]
 
     def __init__(self,
                  velocity: Union[int, float] = 0,
                  current: Union[int, float] = 0,
-                 position: Union[int, float] = 0
+                 position: Union[int, float] = 0,
+                 torque: Union[int, float] = 0,
                  ):
         self.velocity = velocity
         self.current = current
         self.position = position
-    
-    @property
-    def torque(self) -> float:
-        if(self._VALID_CAN_ID in self._VALID_CAN_ID_1):
-            return self.current * self._COEFFICIENT_1
-        elif(self._VALID_CAN_ID in self._VALID_CAN_ID_2):
-            return self.current * self._COEFFICIENT_2
-        else:
-            return 0.0
+        self.torque = torque
 
 class ArmMsgFeedbackHighSpd1(ArmMsgFeedbackHighSpd):
     '''CAN ID:
