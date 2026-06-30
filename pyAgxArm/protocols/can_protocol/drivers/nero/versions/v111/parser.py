@@ -69,8 +69,13 @@ class Codec(DefaultCodec):
 class Parser(DefaultParser):
     """v111 parser using CodecV111."""
 
-    def __init__(self, fps_manager, codec: Optional[Codec] = None):
-        super().__init__(fps_manager, codec=codec or Codec())
+    def __init__(
+        self,
+        fps_manager,
+        codec: Optional[Codec] = None,
+        config: Optional[dict] = None,
+    ):
+        super().__init__(fps_manager, codec=codec or Codec(), config=config)
 
     def _build_rx_map(
         self,

@@ -61,36 +61,7 @@ class ArmMsgFeedbackHighSpd(ArmMsgFeedbackHighSpdBase):
         Byte 6: Motor Position (Second Least Significant Byte)
         Byte 7: Motor Position (Least Significant Byte)
     '''
-    # torque_motor ≈ slope * I_A；T_torque(关节侧) = torque_motor / gear。
-    _TORQUE_FROM_CURRENT_SLOPE_PER_MA = {
-        0x251: 1.6540046234412886,
-        0x252: 1.6549424877215086,
-        0x253: 2.101634469945503,
-        0x254: 2.0986548798072384,
-        0x255: 2.6357843505164102,
-        0x256: 2.6357843505164102,
-        0x257: 2.6357843505164102,
-    }
-    _TORQUE_GEAR_RATIO = {
-        0x251: 0.35,
-        0x252: 0.35,
-        0x253: 0.5,
-        0x254: 0.5,
-        0x255: 1.5,
-        0x256: 1.5,
-        0x257: 1.61,
-    }
-
-    @property
-    def torque(self) -> float:
-        cid = self._VALID_CAN_ID
-        slope = self._TORQUE_FROM_CURRENT_SLOPE_PER_MA.get(cid)
-        if slope is None:
-            return 0.0
-        gear = self._TORQUE_GEAR_RATIO[cid]
-        torque_motor = slope * self.current
-        return torque_motor / gear
-
+    pass
 class ArmMsgFeedbackHighSpd1(ArmMsgFeedbackHighSpd):
     '''CAN ID:
         0x251'''

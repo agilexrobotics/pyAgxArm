@@ -2,7 +2,13 @@ import copy
 import inspect
 from typing import Type, Dict, TypeVar
 from typing_extensions import Literal
-from .constants import ROBOT_OPTION_FIELDS, ROBOT_JOINT_LIMIT_PRESET, ROBOT_JOINT_NAME
+from .constants import (
+    ROBOT_OPTION_FIELDS,
+    ROBOT_JOINT_LIMIT_PRESET,
+    ROBOT_JOINT_NAME,
+    ROBOT_JOINT_TORQUE_K,
+    ROBOT_JOINT_TORQUE_B,
+)
 from ..protocols.can_protocol.comms import *
 from ..protocols.can_protocol.drivers import (
     NeroDriverDefault,
@@ -100,6 +106,14 @@ def create_agx_arm_config(
             config[field] = kwargs[field]
     # ---------- joint name ----------
     config["joint_names"] = ROBOT_JOINT_NAME.get(robot)
+    # ---------- joint torque k ----------
+    config["joint_torque_k"] = ROBOT_JOINT_TORQUE_K.get(
+        robot, ROBOT_JOINT_TORQUE_K["piper"]
+    )
+    # ---------- joint torque b ----------
+    config["joint_torque_b"] = ROBOT_JOINT_TORQUE_B.get(
+        robot, ROBOT_JOINT_TORQUE_B["piper"]
+    )
     # ---------- joint limit ----------
     preset_joint_limits = ROBOT_JOINT_LIMIT_PRESET.get(robot)
     if preset_joint_limits is None:

@@ -78,8 +78,13 @@ class Parser(DefaultParser):
         ik_joint_34: Optional[MessageAbstract[ArmMsgFeedbackIKJointStates34]]
         ik_joint_56: Optional[MessageAbstract[ArmMsgFeedbackIKJointStates56]]
 
-    def __init__(self, fps_manager, codec: Optional[Codec] = None):
-        super().__init__(fps_manager, codec=codec or Codec())
+    def __init__(
+        self,
+        fps_manager,
+        codec: Optional[Codec] = None,
+        config: Optional[dict] = None,
+    ):
+        super().__init__(fps_manager, codec=codec or Codec(), config=config)
 
     def _build_rx_map(
         self,
