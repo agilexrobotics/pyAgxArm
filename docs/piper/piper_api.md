@@ -2089,7 +2089,6 @@ get_joint_angle_vel_limits(
 | --- | --- | --- |
 | `min_angle_limit` | `float` | Minimum angle limit (rad) |
 | `max_angle_limit` | `float` | Maximum angle limit (rad) |
-| `min_joint_spd` | `float` | Minimum joint velocity limit (rad/s) |
 | `max_joint_spd` | `float` | Maximum joint velocity limit (rad/s) |
 
 **Usage Example:**
@@ -2104,7 +2103,7 @@ robot.connect()
 limit = robot.get_joint_angle_vel_limits(1)
 if limit is not None:
     print(limit.msg.min_angle_limit, limit.msg.max_angle_limit)
-    print(limit.msg.min_joint_spd, limit.msg.max_joint_spd)
+    print(limit.msg.max_joint_spd)
 ```
 
 ---
@@ -4814,7 +4813,6 @@ get_joint_angle_vel_limits(
 | --- | --- | --- |
 | `min_angle_limit` | `float` | 最小角度限制（rad） |
 | `max_angle_limit` | `float` | 最大角度限制（rad） |
-| `min_joint_spd` | `float` | 最小关节速度限制（rad/s） |
 | `max_joint_spd` | `float` | 最大关节速度限制（rad/s） |
 
 **使用示例：**
@@ -4829,7 +4827,7 @@ robot.connect()
 limit = robot.get_joint_angle_vel_limits(1)
 if limit is not None:
     print(limit.msg.min_angle_limit, limit.msg.max_angle_limit)
-    print(limit.msg.min_joint_spd, limit.msg.max_joint_spd)
+    print(limit.msg.max_joint_spd)
 ```
 
 ---
