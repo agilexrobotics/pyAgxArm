@@ -2697,7 +2697,7 @@ init_effector(self, effector: str) -> EffectorDriver
 
 | 名称 | 类型 | 说明 |
 | --- | --- | --- |
-| `effector` | `str` | 执行器类型（建议使用 `robot.EFFECTOR.xxx` 常量） |
+| `effector` | `str` | 执行器类型（建议使用 `robot.OPTIONS.EFFECTOR.xxx` 常量） |
 
 **返回值：** `EffectorDriver`
 
@@ -2710,7 +2710,7 @@ cfg = create_agx_arm_config(robot=ArmModel.NERO, firmeware_version=NeroFW.DEFAUL
 robot = AgxArmFactory.create_arm(cfg)
 robot.connect()
 
-end_effector = robot.init_effector(robot.EFFECTOR.REVO2)
+end_effector = robot.init_effector(robot.OPTIONS.EFFECTOR.REVO2)
 ```
 
 ---
