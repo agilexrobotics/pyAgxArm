@@ -346,6 +346,16 @@ def test_depth_frame_to_array_keeps_raw_uint16_values():
     np.testing.assert_array_equal(depth, raw_depth)
 
 
+def test_depth_frame_to_array_preserves_uint16_ndarray_values():
+    raw_depth = np.array([[1, 255, 256, 1000, 65535]], dtype=np.uint16)
+
+    depth = camera.depth_frame_to_array(FakeFrame(5, 1, "Y16", raw_depth))
+
+    assert depth.shape == (1, 5)
+    assert depth.dtype == np.uint16
+    np.testing.assert_array_equal(depth, raw_depth)
+
+
 class FakeProfile:
     def __init__(self, width, height, fps, image_format):
         self.width = width

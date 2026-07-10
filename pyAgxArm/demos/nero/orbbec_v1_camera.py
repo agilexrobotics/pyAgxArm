@@ -235,12 +235,22 @@ def depth_frame_to_array(frame):
     height = int(frame.get_height())
     data = frame.get_data()
     try:
-        if isinstance(data, np.ndarray):
-            values = np.asarray(data, dtype=np.uint8).reshape(-1).view(np.uint16)
+        array = np.asarray(data)
+        if array.dtype == np.uint16:
+            values = np.ascontiguousarray(array).reshape(-1).copy()
+        elif array.dtype == np.uint8:
+            byte_data = np.ascontiguousarray(array).reshape(-1)
+            values = np.frombuffer(byte_data.tobytes(), dtype=np.uint16)
         else:
             values = np.frombuffer(data, dtype=np.uint16)
+        if values.size != width * height:
+            raise ValueError(
+                "expected {} uint16 pixels, received {}".format(
+                    width * height, values.size
+                )
+            )
         return values.reshape(height, width)
-    except ValueError as exc:
+    except (TypeError, ValueError) as exc:
         raise RuntimeError(
             "Invalid Orbbec depth frame buffer for {}x{}".format(width, height)
         ) from exc
