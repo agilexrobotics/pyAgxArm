@@ -1,8 +1,12 @@
 """Hardware-independent tests for Orbbec hand-eye geometry helpers."""
 
+import builtins
+import json
 import math
 from pathlib import Path
 import sys
+from types import SimpleNamespace
+import zipfile
 
 import numpy as np
 import pytest
@@ -29,6 +33,33 @@ def _diverse_samples():
         _sample([0.1, 0.0, 0.0, 0.2, 0.0, 0.0], timestamp=2.0),
         _sample([0.0, 0.1, 0.0, 0.0, -0.25, 0.1], timestamp=3.0),
     ]
+
+
+def _same_axis_samples():
+    return [
+        _sample([0.00, 0.00, 0.00, 0.00, 0.00, 0.00], timestamp=1.0),
+        _sample([0.10, 0.02, 0.00, 0.20, 0.00, 0.00], timestamp=2.0),
+        _sample([0.00, 0.08, 0.03, -0.30, 0.00, 0.00], timestamp=3.0),
+        _sample([-0.04, 0.01, 0.07, 0.45, 0.00, 0.00], timestamp=4.0),
+    ]
+
+
+def _write_sample_archive(
+    path,
+    camera_fingerprint=np.asarray("camera-1"),
+    flange_poses=None,
+):
+    if flange_poses is None:
+        flange_poses = np.zeros((0, 6), dtype=np.float64)
+    np.savez_compressed(
+        path,
+        flange_poses=flange_poses,
+        target_rvecs=np.zeros((0, 3, 1), dtype=np.float64),
+        target_tvecs=np.zeros((0, 3, 1), dtype=np.float64),
+        timestamps=np.zeros((0,), dtype=np.float64),
+        camera_fingerprint=camera_fingerprint,
+        camera_metadata_json=np.asarray(json.dumps({"camera_fingerprint": "camera-1"})),
+    )
 
 
 def _synthetic_handeye_samples():
@@ -473,6 +504,32 @@ def test_sample_persistence_rejects_non_serializable_metadata(tmp_path):
         )
 
 
+def test_sample_persistence_rejects_extra_archive_members_before_loading(tmp_path):
+    path = tmp_path / "extra-member.npz"
+    _write_sample_archive(path)
+    with zipfile.ZipFile(path, "a") as archive:
+        archive.writestr("unexpected.npy", b"not an array")
+
+    with pytest.raises(ValueError, match="unexpected member"):
+        math3d.load_samples(path)
+
+
+def test_sample_persistence_rejects_archive_member_over_resource_limit(tmp_path):
+    path = tmp_path / "oversized-member.npz"
+    _write_sample_archive(path, flange_poses=np.zeros((50000, 6), dtype=np.float64))
+
+    with pytest.raises(ValueError, match="resource limit"):
+        math3d.load_samples(path)
+
+
+def test_sample_persistence_rejects_non_string_scalar_fingerprint(tmp_path):
+    path = tmp_path / "integer-fingerprint.npz"
+    _write_sample_archive(path, camera_fingerprint=np.asarray(123))
+
+    with pytest.raises(ValueError, match="fingerprint.*string"):
+        math3d.load_samples(path)
+
+
 def test_validate_sample_motion_requires_count_and_rotation_diversity():
     with pytest.raises(ValueError, match="at least 3"):
         math3d.validate_sample_motion(_diverse_samples()[:2])
@@ -488,6 +545,36 @@ def test_validate_sample_motion_reports_diverse_motion_summary():
     assert summary["sample_count"] == 3
     assert summary["max_rotation_deg"] > 5.0
     assert summary["translation_span_m"] > 0.0
+
+
+def test_validate_sample_motion_rejects_rotations_about_only_one_axis():
+    with pytest.raises(ValueError, match="non-collinear axes.*observability"):
+        math3d.validate_sample_motion(_same_axis_samples())
+
+
+def test_calibration_rejects_same_axis_rotations_before_opencv(monkeypatch):
+    fake_cv2 = SimpleNamespace(
+        CALIB_HAND_EYE_TSAI=0,
+        CALIB_HAND_EYE_PARK=1,
+        CALIB_HAND_EYE_HORAUD=2,
+        CALIB_HAND_EYE_ANDREFF=3,
+        CALIB_HAND_EYE_DANIILIDIS=4,
+        calibrateHandEye=lambda *args, **kwargs: pytest.fail("OpenCV must not run"),
+    )
+    monkeypatch.setitem(sys.modules, "cv2", fake_cv2)
+
+    with pytest.raises(ValueError, match="non-collinear axes.*observability"):
+        math3d.calibrate_eye_in_hand(
+            _same_axis_samples(), np.eye(4), {"camera_fingerprint": "camera-1"}
+        )
+
+
+def test_validate_sample_motion_reports_conditioning_for_synthetic_samples():
+    samples, _ = _synthetic_handeye_samples()
+
+    summary = math3d.validate_sample_motion(samples)
+
+    assert summary["rotation_axis_conditioning"] >= 0.05
 
 
 def test_named_transform_serializes_inverse_and_normalized_quaternion():
@@ -511,8 +598,17 @@ def test_named_transform_serializes_inverse_and_normalized_quaternion():
     )
 
 
-@pytest.mark.parametrize("method_name", ["TSAI", "PARK"])
-def test_calibrate_eye_in_hand_recovers_deterministic_synthetic_transform(method_name):
+@pytest.mark.parametrize(
+    "method_name,atol",
+    [
+        ("TSAI", 1e-7),
+        ("PARK", 1e-7),
+        ("HORAUD", 1e-7),
+        ("ANDREFF", 1e-7),
+        ("DANIILIDIS", 1e-6),
+    ],
+)
+def test_calibrate_eye_in_hand_recovers_deterministic_synthetic_transform(method_name, atol):
     samples, expected_T_flange_color = _synthetic_handeye_samples()
     T_color_depth = math3d.pose6_to_matrix([0.01, -0.02, 0.03, 0.03, 0.01, -0.02])
 
@@ -524,9 +620,27 @@ def test_calibrate_eye_in_hand_recovers_deterministic_synthetic_transform(method
     )
 
     recovered = np.asarray(result["T_flange_color"]["matrix_row_major_4x4"]).reshape(4, 4)
-    np.testing.assert_allclose(recovered, expected_T_flange_color, atol=1e-7)
+    np.testing.assert_allclose(recovered, expected_T_flange_color, atol=atol)
     recovered_depth = np.asarray(result["T_flange_depth"]["matrix_row_major_4x4"]).reshape(4, 4)
-    np.testing.assert_allclose(recovered_depth, expected_T_flange_color @ T_color_depth, atol=1e-7)
+    np.testing.assert_allclose(
+        recovered_depth, expected_T_flange_color @ T_color_depth, atol=atol
+    )
+
+
+def test_calibration_reports_actionable_error_when_opencv_import_is_blocked(monkeypatch):
+    original_import = builtins.__import__
+
+    def blocked_import(name, *args, **kwargs):
+        if name == "cv2":
+            raise ImportError("blocked for test")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", blocked_import)
+
+    with pytest.raises(ValueError, match="OpenCV is required"):
+        math3d.calibrate_eye_in_hand(
+            _diverse_samples(), np.eye(4), {"camera_fingerprint": "camera-1"}
+        )
 
 
 def test_calibration_result_has_schema_warning_and_near_zero_consistency():

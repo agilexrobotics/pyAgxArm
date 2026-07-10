@@ -14,6 +14,19 @@ import numpy as np
 
 
 _RIGID_TRANSFORM_ATOL = 1e-9
+_ROTATION_AXIS_MIN_ANGLE_RAD = math.radians(1.0)
+_ROTATION_AXIS_CONDITIONING_MIN_RATIO = 0.05
+_SAMPLE_ARCHIVE_MEMBERS = {
+    "flange_poses.npy",
+    "target_rvecs.npy",
+    "target_tvecs.npy",
+    "timestamps.npy",
+    "camera_fingerprint.npy",
+    "camera_metadata_json.npy",
+}
+_SAMPLE_ARCHIVE_MAX_MEMBER_BYTES = 2 * 1024 * 1024
+_SAMPLE_ARCHIVE_MAX_TOTAL_BYTES = 4 * 1024 * 1024
+_SAMPLE_ARCHIVE_MAX_COMPRESSION_RATIO = 2000.0
 
 
 def _validate_rotation(rotation):
@@ -339,6 +352,38 @@ def save_samples(path, samples, camera_metadata):
     )
 
 
+def _preflight_sample_archive(path):
+    """Validate ZIP members and declared sizes before NumPy materializes arrays."""
+    try:
+        with zipfile.ZipFile(path) as archive:
+            members = archive.infolist()
+    except (OSError, EOFError, IOError, zipfile.BadZipFile) as exc:
+        raise ValueError("could not load sample archive: {}".format(exc)) from exc
+
+    names = [member.filename for member in members]
+    unexpected = sorted(set(names).difference(_SAMPLE_ARCHIVE_MEMBERS))
+    if unexpected:
+        raise ValueError("sample archive contains unexpected member {}".format(unexpected[0]))
+    missing = sorted(_SAMPLE_ARCHIVE_MEMBERS.difference(names))
+    if missing:
+        raise ValueError("sample archive missing required field {}".format(missing[0][:-4]))
+    if len(members) != len(_SAMPLE_ARCHIVE_MEMBERS) or len(set(names)) != len(names):
+        raise ValueError("sample archive exceeds resource limit with duplicate members")
+
+    total_size = 0
+    for member in members:
+        if member.file_size > _SAMPLE_ARCHIVE_MAX_MEMBER_BYTES:
+            raise ValueError("sample archive member exceeds resource limit")
+        total_size += member.file_size
+        if total_size > _SAMPLE_ARCHIVE_MAX_TOTAL_BYTES:
+            raise ValueError("sample archive total exceeds resource limit")
+        if member.file_size and (
+            not member.compress_size
+            or member.file_size / member.compress_size > _SAMPLE_ARCHIVE_MAX_COMPRESSION_RATIO
+        ):
+            raise ValueError("sample archive compression exceeds resource limit")
+
+
 def load_samples(path, expected_fingerprint=None):
     """Load a sample archive, rejecting malformed data and fingerprint mismatches."""
     required = {
@@ -349,6 +394,7 @@ def load_samples(path, expected_fingerprint=None):
         "camera_fingerprint",
         "camera_metadata_json",
     }
+    _preflight_sample_archive(path)
     try:
         with np.load(path, allow_pickle=False) as archive:
             missing = sorted(required.difference(archive.files))
@@ -370,8 +416,11 @@ def load_samples(path, expected_fingerprint=None):
 
     if fingerprint_data.shape != () or metadata_data.shape != ():
         raise ValueError("sample archive metadata fields must be scalar values")
+    fingerprint_item = fingerprint_data.item()
+    if not isinstance(fingerprint_item, (str, np.str_)):
+        raise ValueError("sample archive camera fingerprint must be a scalar string")
     try:
-        fingerprint = str(fingerprint_data.item())
+        fingerprint = str(fingerprint_item)
         metadata = json.loads(str(metadata_data.item()))
     except (TypeError, ValueError, json.JSONDecodeError) as exc:
         raise ValueError("sample archive has invalid camera metadata JSON") from exc
@@ -424,6 +473,28 @@ def rotation_angle(rotation):
     return math.acos(cosine)
 
 
+def _rotation_log_vector(rotation):
+    """Return the axis-angle logarithm of a finite proper rotation matrix."""
+    matrix = _validate_rotation(rotation)
+    angle = rotation_angle(matrix)
+    if angle < _ROTATION_AXIS_MIN_ANGLE_RAD:
+        return None
+    if math.pi - angle < 1e-6:
+        eigenvalues, eigenvectors = np.linalg.eig(matrix)
+        axis = np.real(eigenvectors[:, np.argmin(np.abs(eigenvalues - 1.0))])
+        axis /= np.linalg.norm(axis)
+    else:
+        axis = np.array(
+            [
+                matrix[2, 1] - matrix[1, 2],
+                matrix[0, 2] - matrix[2, 0],
+                matrix[1, 0] - matrix[0, 1],
+            ],
+            dtype=np.float64,
+        ) / (2.0 * math.sin(angle))
+    return angle * axis
+
+
 def validate_sample_motion(samples):
     """Validate sample count and orientation diversity for hand-eye calibration."""
     normalized = _normalized_samples(samples)
@@ -434,10 +505,14 @@ def validate_sample_motion(samples):
     translations = np.asarray([transform[:3, 3] for transform in transforms])
     max_rotation = 0.0
     translation_span = 0.0
+    rotation_log_vectors = []
     for left in range(len(transforms)):
         for right in range(left + 1, len(transforms)):
             relative = invert_transform(transforms[left]) @ transforms[right]
             max_rotation = max(max_rotation, rotation_angle(relative[:3, :3]))
+            log_vector = _rotation_log_vector(relative[:3, :3])
+            if log_vector is not None:
+                rotation_log_vectors.append(log_vector)
             translation_span = max(
                 translation_span,
                 float(np.linalg.norm(translations[left] - translations[right])),
@@ -448,10 +523,24 @@ def validate_sample_motion(samples):
             "insufficient rotation diversity: capture 15-30 samples with diverse "
             "orientations (maximum relative rotation must be at least 5 degrees)"
         )
+    singular_values = np.linalg.svd(
+        np.asarray(rotation_log_vectors, dtype=np.float64), compute_uv=False
+    )
+    axis_conditioning = (
+        float(singular_values[1] / singular_values[0])
+        if len(singular_values) >= 2 and singular_values[0] > 0.0
+        else 0.0
+    )
+    if axis_conditioning < _ROTATION_AXIS_CONDITIONING_MIN_RATIO:
+        raise ValueError(
+            "insufficient non-collinear axes for rotational observability; capture "
+            "motions about at least two independent rotation axes"
+        )
     return {
         "sample_count": len(normalized),
         "max_rotation_deg": float(max_rotation_deg),
         "translation_span_m": float(translation_span),
+        "rotation_axis_conditioning": axis_conditioning,
     }
 
 
