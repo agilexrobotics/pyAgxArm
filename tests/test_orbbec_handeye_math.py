@@ -14,6 +14,47 @@ sys.path.insert(0, str(NERO_DEMO_DIR))
 import orbbec_handeye_math as math3d  # noqa: E402
 
 
+def _sample(flange_pose, target_rvec=(0.0, 0.0, 0.0), target_tvec=(0.0, 0.0, 1.0), timestamp=1.0):
+    return {
+        "flange_pose": list(flange_pose),
+        "target_rvec": np.asarray(target_rvec, dtype=np.float64).reshape(3, 1),
+        "target_tvec": np.asarray(target_tvec, dtype=np.float64).reshape(3, 1),
+        "timestamp": timestamp,
+    }
+
+
+def _diverse_samples():
+    return [
+        _sample([0.0, 0.0, 0.0, 0.0, 0.0, 0.0], timestamp=1.0),
+        _sample([0.1, 0.0, 0.0, 0.2, 0.0, 0.0], timestamp=2.0),
+        _sample([0.0, 0.1, 0.0, 0.0, -0.25, 0.1], timestamp=3.0),
+    ]
+
+
+def _synthetic_handeye_samples():
+    cv2 = pytest.importorskip("cv2")
+    if not hasattr(cv2, "calibrateHandEye"):
+        pytest.skip("OpenCV build does not provide calibrateHandEye")
+    T_flange_color = math3d.pose6_to_matrix([0.05, 0.01, 0.08, 0.1, -0.05, 0.2])
+    T_base_target = math3d.pose6_to_matrix([0.7, -0.2, 0.5, -0.3, 0.2, 0.4])
+    flange_poses = [
+        [0.00, 0.00, 0.00, 0.00, 0.00, 0.00],
+        [0.10, -0.03, 0.02, 0.25, 0.10, -0.15],
+        [-0.04, 0.08, 0.06, -0.30, 0.20, 0.25],
+        [0.03, 0.06, -0.04, 0.15, -0.35, 0.30],
+        [-0.08, -0.02, 0.10, -0.20, -0.15, -0.35],
+        [0.06, 0.04, 0.03, 0.35, 0.25, 0.10],
+    ]
+    samples = []
+    for index, flange_pose in enumerate(flange_poses):
+        T_color_target = math3d.invert_transform(
+            math3d.pose6_to_matrix(flange_pose) @ T_flange_color
+        ) @ T_base_target
+        rvec, _ = cv2.Rodrigues(T_color_target[:3, :3])
+        samples.append(_sample(flange_pose, rvec, T_color_target[:3, 3], index + 1.0))
+    return samples, T_flange_color
+
+
 def test_checkerboard_points_use_inner_corners_and_metres():
     points = math3d.create_checkerboard_object_points((10, 7), 0.02)
 
@@ -344,3 +385,158 @@ def test_depth_pixel_to_base_uses_base_flange_then_flange_depth():
 
     # p_depth=[0.2, 0.1, 1.0], p_flange=[0.3, -0.8, 0.4].
     np.testing.assert_allclose(point, [1.3, 0.2, 0.6])
+
+
+def test_sample_persistence_round_trip_preserves_metadata_and_float64(tmp_path):
+    samples = _diverse_samples()
+    metadata = {
+        "camera_fingerprint": "orbbec:abc123",
+        "serial_number": "ABC123",
+        "intrinsics": {"fx": 600.0, "fy": 601.0},
+    }
+    path = tmp_path / "samples.npz"
+
+    math3d.save_samples(path, samples, metadata)
+    loaded, loaded_metadata = math3d.load_samples(path, "orbbec:abc123")
+
+    assert loaded_metadata == metadata
+    assert len(loaded) == len(samples)
+    assert loaded[0]["flange_pose"] == samples[0]["flange_pose"]
+    assert loaded[0]["target_rvec"].shape == (3, 1)
+    assert loaded[0]["target_tvec"].shape == (3, 1)
+    assert loaded[0]["target_rvec"].dtype == np.float64
+    assert loaded[0]["target_tvec"].dtype == np.float64
+    assert loaded[0]["timestamp"] == 1.0
+
+
+def test_sample_persistence_round_trips_empty_samples_with_deterministic_shapes(tmp_path):
+    path = tmp_path / "empty.npz"
+    math3d.save_samples(path, [], {"camera_fingerprint": "camera-1"})
+
+    with np.load(path, allow_pickle=False) as archive:
+        assert archive["flange_poses"].shape == (0, 6)
+        assert archive["target_rvecs"].shape == (0, 3, 1)
+        assert archive["target_tvecs"].shape == (0, 3, 1)
+        assert archive["timestamps"].shape == (0,)
+
+    samples, metadata = math3d.load_samples(path)
+    assert samples == []
+    assert metadata == {"camera_fingerprint": "camera-1"}
+
+
+def test_sample_persistence_rejects_fingerprint_mismatch_and_missing_fields(tmp_path):
+    path = tmp_path / "samples.npz"
+    math3d.save_samples(path, _diverse_samples(), {"camera_fingerprint": "camera-1"})
+
+    with pytest.raises(ValueError, match="fingerprint"):
+        math3d.load_samples(path, expected_fingerprint="other-camera")
+
+    corrupt_path = tmp_path / "corrupt.npz"
+    np.savez_compressed(corrupt_path, flange_poses=np.zeros((0, 6)))
+    with pytest.raises(ValueError, match="missing required field"):
+        math3d.load_samples(corrupt_path)
+
+
+def test_sample_persistence_rejects_truncated_archive_with_value_error(tmp_path):
+    path = tmp_path / "truncated.npz"
+    math3d.save_samples(path, _diverse_samples(), {"camera_fingerprint": "camera-1"})
+    path.write_bytes(path.read_bytes()[:20])
+
+    with pytest.raises(ValueError, match="could not load sample archive"):
+        math3d.load_samples(path)
+
+
+def test_sample_persistence_rejects_non_serializable_metadata(tmp_path):
+    with pytest.raises(ValueError, match="JSON-serializable"):
+        math3d.save_samples(
+            tmp_path / "samples.npz",
+            [],
+            {"camera_fingerprint": "camera-1", "unsupported": {1, 2}},
+        )
+
+
+def test_validate_sample_motion_requires_count_and_rotation_diversity():
+    with pytest.raises(ValueError, match="at least 3"):
+        math3d.validate_sample_motion(_diverse_samples()[:2])
+
+    repeated = [_sample([0.02 * index, 0.0, 0.0, 0, 0, 0]) for index in range(3)]
+    with pytest.raises(ValueError, match="rotation diversity.*15-30"):
+        math3d.validate_sample_motion(repeated)
+
+
+def test_validate_sample_motion_reports_diverse_motion_summary():
+    summary = math3d.validate_sample_motion(_diverse_samples())
+
+    assert summary["sample_count"] == 3
+    assert summary["max_rotation_deg"] > 5.0
+    assert summary["translation_span_m"] > 0.0
+
+
+def test_named_transform_serializes_inverse_and_normalized_quaternion():
+    transform = math3d.make_transform(
+        math3d.pose6_to_matrix([0, 0, 0, 0.2, -0.1, 0.4])[:3, :3],
+        [0.1, -0.2, 0.3],
+    )
+    named = math3d.named_transform("flange", "color", transform)
+    inverse = math3d.named_transform("color", "flange", math3d.invert_transform(transform))
+
+    assert named["parent_frame"] == "flange"
+    assert named["child_frame"] == "color"
+    assert len(named["matrix_row_major_4x4"]) == 16
+    assert np.isclose(np.linalg.norm(named["quaternion_xyzw"]), 1.0)
+    assert np.all(np.isfinite(np.asarray(named["pose6_xyz_rpy"])))
+    np.testing.assert_allclose(
+        np.asarray(named["matrix_row_major_4x4"]).reshape(4, 4)
+        @ np.asarray(inverse["matrix_row_major_4x4"]).reshape(4, 4),
+        np.eye(4),
+        atol=1e-15,
+    )
+
+
+@pytest.mark.parametrize("method_name", ["TSAI", "PARK"])
+def test_calibrate_eye_in_hand_recovers_deterministic_synthetic_transform(method_name):
+    samples, expected_T_flange_color = _synthetic_handeye_samples()
+    T_color_depth = math3d.pose6_to_matrix([0.01, -0.02, 0.03, 0.03, 0.01, -0.02])
+
+    result = math3d.calibrate_eye_in_hand(
+        samples,
+        T_color_depth,
+        {"camera_fingerprint": "camera-1"},
+        method_name=method_name,
+    )
+
+    recovered = np.asarray(result["T_flange_color"]["matrix_row_major_4x4"]).reshape(4, 4)
+    np.testing.assert_allclose(recovered, expected_T_flange_color, atol=1e-7)
+    recovered_depth = np.asarray(result["T_flange_depth"]["matrix_row_major_4x4"]).reshape(4, 4)
+    np.testing.assert_allclose(recovered_depth, expected_T_flange_color @ T_color_depth, atol=1e-7)
+
+
+def test_calibration_result_has_schema_warning_and_near_zero_consistency():
+    samples, _ = _synthetic_handeye_samples()
+    result = math3d.calibrate_eye_in_hand(
+        samples,
+        np.eye(4),
+        {"camera_fingerprint": "camera-1"},
+    )
+
+    assert result["schema_version"] == 1
+    assert result["sample_count"] == 6
+    assert result["checkerboard"] == {"inner_corners": [10, 7], "square_size_m": 0.02}
+    assert result["quality_warnings"]
+    assert result["consistency"]["translation_max_m"] < 1e-7
+    assert result["consistency"]["rotation_max_deg"] < 1e-5
+    assert all(np.isfinite(value) for value in result["consistency"].values())
+
+
+def test_calibration_rejects_unknown_method_and_nonfinite_sample_data():
+    samples = _diverse_samples()
+    with pytest.raises(ValueError, match="method"):
+        math3d.calibrate_eye_in_hand(
+            samples, np.eye(4), {"camera_fingerprint": "camera-1"}, method_name="BAD"
+        )
+
+    samples[0]["target_tvec"][0, 0] = float("nan")
+    with pytest.raises(ValueError, match="finite"):
+        math3d.calibrate_eye_in_hand(
+            samples, np.eye(4), {"camera_fingerprint": "camera-1"}
+        )
