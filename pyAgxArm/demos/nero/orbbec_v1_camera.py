@@ -10,6 +10,7 @@ import numpy as np
 
 
 _DOCS_PATH = "docs/nero/orbbec_dabai_handeye.md"
+_SDK_SOURCE_URL = "https://github.com/orbbec/pyorbbecsdk/tree/main"
 _RIGID_TRANSFORM_ATOL = 1e-6
 
 
@@ -19,7 +20,8 @@ def require_orbbec_sdk():
         import pyorbbecsdk
     except ImportError as exc:
         raise RuntimeError(
-            "Orbbec SDK v1 is required. Follow {}.".format(_DOCS_PATH)
+            "Orbbec SDK v1 module 'pyorbbecsdk' is required. Follow {} or install "
+            "the official v1 source from {}.".format(_DOCS_PATH, _SDK_SOURCE_URL)
         ) from exc
     return pyorbbecsdk
 
@@ -338,11 +340,26 @@ class OrbbecV1Camera:
             return None
         return copy.deepcopy(self._metadata)
 
+    def _clear_run_state(self):
+        """Discard state that must not survive a new pipeline start."""
+        self._context = None
+        self._pipeline = None
+        self._sdk = None
+        self._camera_param = None
+        self._device_info = None
+        self._metadata = None
+        self._started = False
+        self.color_profile = None
+        self.depth_profile = None
+        self.color_profile_used_fallback = None
+        self.depth_profile_used_fallback = None
+
     def start(self):
         """Configure and start the v1 pipeline with unaligned raw depth."""
         if self._started:
             return self
 
+        self._clear_run_state()
         pipeline = None
         try:
             sdk = require_orbbec_sdk()
@@ -379,6 +396,7 @@ class OrbbecV1Camera:
                     pipeline.stop()
                 except Exception:
                     pass
+            self._clear_run_state()
             raise RuntimeError(
                 "Failed to start Orbbec camera: {}. Check connection, serial, and SDK setup."
                 .format(exc)
@@ -444,6 +462,10 @@ class OrbbecV1Camera:
         """Stop the pipeline once; repeated calls are harmless."""
         pipeline = self._pipeline
         self._pipeline = None
+        self._context = None
+        self._sdk = None
+        self._camera_param = None
+        self._device_info = None
         self._started = False
         if pipeline is not None:
             pipeline.stop()

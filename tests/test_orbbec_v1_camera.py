@@ -3,6 +3,7 @@
 from pathlib import Path
 import sys
 from types import SimpleNamespace
+import builtins
 
 import numpy as np
 import pytest
@@ -207,9 +208,25 @@ def test_camera_fingerprint_is_stable_and_changes_with_each_input():
     assert first != camera.camera_fingerprint("ABC", "1280x720@30_RGB", "1280x720@30_Y16")
 
 
-def test_require_orbbec_sdk_explains_how_to_install_the_optional_dependency():
-    with pytest.raises(RuntimeError, match="docs/nero/orbbec_dabai_handeye\\.md"):
+def test_require_orbbec_sdk_explains_how_to_install_the_optional_dependency(
+    monkeypatch,
+):
+    original_import = builtins.__import__
+
+    def missing_orbbec_sdk(name, *args, **kwargs):
+        if name == "pyorbbecsdk":
+            raise ImportError("forced missing SDK")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", missing_orbbec_sdk)
+
+    with pytest.raises(RuntimeError) as error:
         camera.require_orbbec_sdk()
+
+    message = str(error.value)
+    assert "pyorbbecsdk" in message
+    assert "docs/nero/orbbec_dabai_handeye.md" in message
+    assert "https://github.com/orbbec/pyorbbecsdk/tree/main" in message
 
 
 @pytest.mark.parametrize(
@@ -509,6 +526,33 @@ def make_fake_sdk(devices, pipeline, config):
     )
 
 
+def make_lifecycle_run(color_profile, depth_profile, depth_scale):
+    color = FakeFrame(
+        2,
+        1,
+        FakeFormats.RGB,
+        np.array([[[3, 2, 1], [6, 5, 4]]], dtype=np.uint8).tobytes(),
+        timestamp=101,
+    )
+    depth = FakeDepthFrame(
+        2,
+        2,
+        "Y16",
+        np.array([[1, 2], [3, 4]], dtype=np.uint16).tobytes(),
+        timestamp=102,
+        depth_scale=depth_scale,
+    )
+    pipeline = FakePipeline(
+        FakeLifecycleProfiles(selected=color_profile),
+        FakeLifecycleProfiles(default=depth_profile),
+        make_camera_param(),
+        FakeFrameSet(color, depth),
+    )
+    config = FakeConfig()
+    sdk = make_fake_sdk([SimpleNamespace(serial="ABC")], pipeline, config)
+    return sdk, pipeline
+
+
 def test_camera_start_wait_metadata_and_idempotent_stop(monkeypatch):
     color_profile = FakeProfile(1280, 720, 30, "RGB")
     depth_profile = FakeProfile(640, 480, 30, "Y16")
@@ -566,6 +610,65 @@ def test_camera_start_wait_metadata_and_idempotent_stop(monkeypatch):
     adapter.stop()
 
     assert pipeline.stop_count == 1
+
+
+def test_camera_restart_replaces_metadata_and_profiles_with_second_run(monkeypatch):
+    first_sdk, first_pipeline = make_lifecycle_run(
+        FakeProfile(1280, 720, 30, "RGB"),
+        FakeProfile(640, 480, 30, "Y16"),
+        depth_scale=10.0,
+    )
+    second_sdk, second_pipeline = make_lifecycle_run(
+        FakeProfile(640, 480, 30, "RGB"),
+        FakeProfile(320, 240, 15, "Y16"),
+        depth_scale=2.0,
+    )
+    sdks = iter((first_sdk, second_sdk))
+    monkeypatch.setattr(camera, "require_orbbec_sdk", lambda: next(sdks))
+    adapter = camera.OrbbecV1Camera()
+
+    adapter.start()
+    first = adapter.wait_for_frames()
+    adapter.stop()
+    adapter.start()
+    second = adapter.wait_for_frames()
+
+    assert first.depth_scale_m == pytest.approx(0.01)
+    assert second.depth_scale_m == pytest.approx(0.002)
+    assert adapter.metadata["depth_scale_m"] == pytest.approx(0.002)
+    assert adapter.metadata["color_profile"] == "640x480@30_RGB"
+    assert adapter.metadata["depth_profile"] == "320x240@15_Y16"
+    assert first_pipeline.stop_count == 1
+    assert second_pipeline.stop_count == 0
+
+
+def test_failed_restart_clears_previous_run_metadata_and_profiles(monkeypatch):
+    first_sdk, _ = make_lifecycle_run(
+        FakeProfile(1280, 720, 30, "RGB"),
+        FakeProfile(640, 480, 30, "Y16"),
+        depth_scale=10.0,
+    )
+    failed_sdk, failed_pipeline = make_lifecycle_run(
+        FakeProfile(640, 480, 30, "RGB"),
+        FakeProfile(320, 240, 15, "Y16"),
+        depth_scale=2.0,
+    )
+    failed_pipeline.start_error = RuntimeError("second SDK start failed")
+    sdks = iter((first_sdk, failed_sdk))
+    monkeypatch.setattr(camera, "require_orbbec_sdk", lambda: next(sdks))
+    adapter = camera.OrbbecV1Camera()
+
+    adapter.start()
+    adapter.wait_for_frames()
+    adapter.stop()
+    with pytest.raises(RuntimeError, match="second SDK start failed"):
+        adapter.start()
+
+    assert adapter.metadata is None
+    assert adapter.color_profile is None
+    assert adapter.depth_profile is None
+    assert adapter.color_profile_used_fallback is None
+    assert adapter.depth_profile_used_fallback is None
 
 
 def test_camera_start_requires_exactly_one_device_without_serial(monkeypatch):
