@@ -32,9 +32,11 @@ def test_checkerboard_points_use_inner_corners_and_metres():
         ((10, -7), 0.02),
         ((10, 7), 0.0),
         ((10, 7), -0.02),
+        ((10, 7), float("nan")),
+        ((10, 7), float("inf")),
     ],
 )
-def test_checkerboard_rejects_non_positive_dimensions_and_size(
+def test_checkerboard_rejects_invalid_dimensions_and_size(
     checkerboard, square_size_m
 ):
     with pytest.raises(ValueError):
@@ -95,6 +97,54 @@ def test_invert_transform_composes_to_identity():
 
     np.testing.assert_allclose(transform @ inverse, np.eye(4), atol=1e-15)
     np.testing.assert_allclose(inverse @ transform, np.eye(4), atol=1e-15)
+
+
+@pytest.mark.parametrize(
+    "transform,error_pattern",
+    [
+        pytest.param(np.eye(3), "shape", id="wrong-shape"),
+        pytest.param(
+            np.diag([float("nan"), 1.0, 1.0, 1.0]),
+            "finite",
+            id="nonfinite",
+        ),
+        pytest.param(
+            np.array(
+                [
+                    [1.0, 0.0, 0.0, 0.0],
+                    [0.0, 1.0, 0.0, 0.0],
+                    [0.0, 0.0, 1.0, 0.0],
+                    [1.0, 0.0, 0.0, 1.0],
+                ]
+            ),
+            "bottom row",
+            id="bad-bottom-row",
+        ),
+        pytest.param(
+            np.diag([2.0, 1.0, 1.0, 1.0]),
+            "orthonormal",
+            id="scaled-rotation",
+        ),
+        pytest.param(
+            np.diag([-1.0, 1.0, 1.0, 1.0]),
+            "determinant",
+            id="reflection",
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    "operation", ["matrix_to_pose6", "invert_transform", "transform_point"]
+)
+def test_geometry_helpers_reject_malformed_rigid_transforms(
+    operation, transform, error_pattern
+):
+    function = getattr(math3d, operation)
+
+    with pytest.raises(ValueError, match=error_pattern):
+        if operation == "transform_point":
+            function(transform, [0.0, 0.0, 0.0])
+        else:
+            function(transform)
 
 
 def test_depth_pixel_to_camera_point_converts_raw_depth_to_metres():
@@ -164,6 +214,75 @@ def test_deprojection_rejects_nonfinite_focal_lengths(key, value):
         )
 
 
+@pytest.mark.parametrize("field", ["u", "v", "cx", "cy"])
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), -float("inf")])
+def test_deprojection_rejects_nonfinite_pixel_coordinates(field, value):
+    intrinsics = {"fx": 500.0, "fy": 500.0, "cx": 320.0, "cy": 240.0}
+    arguments = {"u": 320.0, "v": 240.0}
+    if field in intrinsics:
+        intrinsics[field] = value
+    else:
+        arguments[field] = value
+
+    with pytest.raises(ValueError, match=field):
+        math3d.deproject_depth_pixel(
+            arguments["u"],
+            arguments["v"],
+            1000,
+            intrinsics,
+            depth_scale_m=0.001,
+        )
+
+
+@pytest.mark.parametrize(
+    "min_depth_m", [float("nan"), float("inf"), -float("inf"), -0.01]
+)
+def test_deprojection_rejects_invalid_minimum_depth_bound(min_depth_m):
+    intrinsics = {"fx": 500.0, "fy": 500.0, "cx": 320.0, "cy": 240.0}
+
+    with pytest.raises(ValueError, match="min_depth_m"):
+        math3d.deproject_depth_pixel(
+            320,
+            240,
+            1000,
+            intrinsics,
+            depth_scale_m=0.001,
+            min_depth_m=min_depth_m,
+        )
+
+
+@pytest.mark.parametrize(
+    "max_depth_m", [float("nan"), float("inf"), -float("inf")]
+)
+def test_deprojection_rejects_nonfinite_maximum_depth_bound(max_depth_m):
+    intrinsics = {"fx": 500.0, "fy": 500.0, "cx": 320.0, "cy": 240.0}
+
+    with pytest.raises(ValueError, match="max_depth_m"):
+        math3d.deproject_depth_pixel(
+            320,
+            240,
+            1000,
+            intrinsics,
+            depth_scale_m=0.001,
+            max_depth_m=max_depth_m,
+        )
+
+
+def test_deprojection_rejects_maximum_depth_below_minimum():
+    intrinsics = {"fx": 500.0, "fy": 500.0, "cx": 320.0, "cy": 240.0}
+
+    with pytest.raises(ValueError, match="max_depth_m"):
+        math3d.deproject_depth_pixel(
+            320,
+            240,
+            1000,
+            intrinsics,
+            depth_scale_m=0.001,
+            min_depth_m=1.0,
+            max_depth_m=0.5,
+        )
+
+
 @pytest.mark.parametrize(
     "bounds",
     [
@@ -199,13 +318,23 @@ def test_deprojection_accepts_depth_at_configured_range_boundaries():
 def test_depth_pixel_to_base_uses_base_flange_then_flange_depth():
     intrinsics = {"fx": 500.0, "fy": 500.0, "cx": 320.0, "cy": 240.0}
     T_flange_depth = np.eye(4)
-    T_flange_depth[:3, 3] = [0.0, 0.0, 0.1]
+    T_flange_depth[:3, :3] = [
+        [1.0, 0.0, 0.0],
+        [0.0, 0.0, -1.0],
+        [0.0, 1.0, 0.0],
+    ]
+    T_flange_depth[:3, 3] = [0.1, 0.2, 0.3]
     T_base_flange = np.eye(4)
-    T_base_flange[:3, 3] = [0.5, 0.0, 0.0]
+    T_base_flange[:3, :3] = [
+        [0.0, -1.0, 0.0],
+        [1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0],
+    ]
+    T_base_flange[:3, 3] = [0.5, -0.1, 0.2]
 
     point = math3d.depth_pixel_to_base(
-        320,
-        240,
+        420,
+        290,
         1000,
         intrinsics,
         0.001,
@@ -213,4 +342,5 @@ def test_depth_pixel_to_base_uses_base_flange_then_flange_depth():
         T_base_flange,
     )
 
-    np.testing.assert_allclose(point, [0.5, 0.0, 1.1])
+    # p_depth=[0.2, 0.1, 1.0], p_flange=[0.3, -0.8, 0.4].
+    np.testing.assert_allclose(point, [1.3, 0.2, 0.6])
