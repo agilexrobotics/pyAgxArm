@@ -8,6 +8,7 @@ import json
 import math
 import zipfile
 from datetime import datetime, timezone
+from numbers import Integral, Real
 
 import numpy as np
 
@@ -140,9 +141,37 @@ def _validate_rigid_transform(transform):
 
 def create_checkerboard_object_points(checkerboard, square_size_m):
     """Return planar checkerboard inner-corner coordinates in metres."""
-    cols, rows = checkerboard
+    try:
+        dimensions = tuple(checkerboard)
+    except TypeError as exc:
+        raise ValueError(
+            "Checkerboard dimensions must contain exactly two finite positive integers."
+        ) from exc
+    if len(dimensions) != 2:
+        raise ValueError(
+            "Checkerboard dimensions must contain exactly two finite positive integers."
+        )
+
+    normalized_dimensions = []
+    for dimension in dimensions:
+        if isinstance(dimension, (bool, np.bool_)) or not isinstance(dimension, Real):
+            raise ValueError(
+                "Checkerboard dimensions must contain exactly two finite positive integers."
+            )
+        numeric_dimension = float(dimension)
+        if (
+            not np.isfinite(numeric_dimension)
+            or numeric_dimension <= 0.0
+            or not numeric_dimension.is_integer()
+        ):
+            raise ValueError(
+                "Checkerboard dimensions must contain exactly two finite positive integers."
+            )
+        normalized_dimensions.append(int(dimension))
+    cols, rows = normalized_dimensions
+
     square_size_m = float(square_size_m)
-    if cols <= 0 or rows <= 0 or not np.isfinite(square_size_m) or square_size_m <= 0:
+    if not np.isfinite(square_size_m) or square_size_m <= 0:
         raise ValueError(
             "Checkerboard dimensions and square size must be finite and positive."
         )

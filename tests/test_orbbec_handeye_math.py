@@ -71,6 +71,16 @@ def test_checkerboard_points_use_inner_corners_and_metres():
         ((10, 0), 0.02),
         ((-10, 7), 0.02),
         ((10, -7), 0.02),
+        ((float("nan"), 7), 0.02),
+        ((float("inf"), 7), 0.02),
+        ((-float("inf"), 7), 0.02),
+        ((10.5, 7), 0.02),
+        ((10, 6.5), 0.02),
+        (("10", 7), 0.02),
+        ((True, 7), 0.02),
+        ((10, False), 0.02),
+        ((10,), 0.02),
+        ((10, 7, 1), 0.02),
         ((10, 7), 0.0),
         ((10, 7), -0.02),
         ((10, 7), float("nan")),
@@ -80,8 +90,16 @@ def test_checkerboard_points_use_inner_corners_and_metres():
 def test_checkerboard_rejects_invalid_dimensions_and_size(
     checkerboard, square_size_m
 ):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Checkerboard dimensions"):
         math3d.create_checkerboard_object_points(checkerboard, square_size_m)
+
+
+def test_checkerboard_accepts_integral_numpy_scalar_dimensions():
+    points = math3d.create_checkerboard_object_points(
+        (np.int64(10), np.int32(7)), 0.02
+    )
+
+    assert points.shape == (70, 3)
 
 
 def test_pose6_to_matrix_uses_zyx_rpy_and_homogeneous_translation():
