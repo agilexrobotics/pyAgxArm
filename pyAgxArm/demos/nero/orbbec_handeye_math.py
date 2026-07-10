@@ -81,7 +81,14 @@ def deproject_depth_pixel(
     max_depth_m=None,
 ):
     """Deproject one raw depth pixel into the metric depth-camera frame."""
-    depth_m = float(depth_raw) * float(depth_scale_m)
+    depth_raw = float(depth_raw)
+    depth_scale_m = float(depth_scale_m)
+    if not np.isfinite(depth_raw) or depth_raw <= 0.0:
+        raise ValueError("depth_raw must be finite and greater than zero")
+    if not np.isfinite(depth_scale_m) or depth_scale_m <= 0.0:
+        raise ValueError("depth_scale_m must be finite and greater than zero")
+
+    depth_m = depth_raw * depth_scale_m
     if not np.isfinite(depth_m) or depth_m <= 0.0:
         raise ValueError("depth must be finite and greater than zero")
     if depth_m < float(min_depth_m) or (
@@ -91,8 +98,8 @@ def deproject_depth_pixel(
 
     fx = float(intrinsics["fx"])
     fy = float(intrinsics["fy"])
-    if fx <= 0.0 or fy <= 0.0:
-        raise ValueError("camera focal lengths must be positive")
+    if not np.isfinite(fx) or not np.isfinite(fy) or fx <= 0.0 or fy <= 0.0:
+        raise ValueError("camera focal lengths must be finite and positive")
 
     x = (float(u) - float(intrinsics["cx"])) * depth_m / fx
     y = (float(v) - float(intrinsics["cy"])) * depth_m / fy

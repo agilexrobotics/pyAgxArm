@@ -108,10 +108,10 @@ def test_depth_pixel_to_camera_point_converts_raw_depth_to_metres():
 
 
 @pytest.mark.parametrize("depth_raw", [0, -1, float("nan"), float("inf")])
-def test_deprojection_rejects_invalid_depth(depth_raw):
+def test_deprojection_rejects_nonfinite_or_nonpositive_raw_depth(depth_raw):
     intrinsics = {"fx": 500.0, "fy": 500.0, "cx": 320.0, "cy": 240.0}
 
-    with pytest.raises(ValueError, match="depth"):
+    with pytest.raises(ValueError, match="depth_raw"):
         math3d.deproject_depth_pixel(
             320, 240, depth_raw, intrinsics, depth_scale_m=0.001
         )
@@ -120,12 +120,21 @@ def test_deprojection_rejects_invalid_depth(depth_raw):
 @pytest.mark.parametrize(
     "depth_scale_m", [0, -0.001, float("nan"), float("inf")]
 )
-def test_deprojection_rejects_scale_that_produces_invalid_depth(depth_scale_m):
+def test_deprojection_rejects_nonfinite_or_nonpositive_depth_scale(depth_scale_m):
     intrinsics = {"fx": 500.0, "fy": 500.0, "cx": 320.0, "cy": 240.0}
 
-    with pytest.raises(ValueError, match="depth"):
+    with pytest.raises(ValueError, match="depth_scale_m"):
         math3d.deproject_depth_pixel(
             320, 240, 1000, intrinsics, depth_scale_m=depth_scale_m
+        )
+
+
+def test_deprojection_rejects_negative_raw_depth_with_negative_scale():
+    intrinsics = {"fx": 500.0, "fy": 500.0, "cx": 320.0, "cy": 240.0}
+
+    with pytest.raises(ValueError, match="depth_raw"):
+        math3d.deproject_depth_pixel(
+            320, 240, -1000, intrinsics, depth_scale_m=-0.001
         )
 
 
@@ -138,6 +147,18 @@ def test_deprojection_rejects_non_positive_focal_lengths(key, value):
     intrinsics[key] = value
 
     with pytest.raises(ValueError, match="focal lengths"):
+        math3d.deproject_depth_pixel(
+            320, 240, 1000, intrinsics, depth_scale_m=0.001
+        )
+
+
+@pytest.mark.parametrize("key", ["fx", "fy"])
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), -float("inf")])
+def test_deprojection_rejects_nonfinite_focal_lengths(key, value):
+    intrinsics = {"fx": 500.0, "fy": 500.0, "cx": 320.0, "cy": 240.0}
+    intrinsics[key] = value
+
+    with pytest.raises(ValueError, match="finite and positive"):
         math3d.deproject_depth_pixel(
             320, 240, 1000, intrinsics, depth_scale_m=0.001
         )
