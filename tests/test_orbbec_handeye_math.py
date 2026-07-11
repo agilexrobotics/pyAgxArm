@@ -473,6 +473,54 @@ def test_sample_persistence_round_trips_empty_samples_with_deterministic_shapes(
     assert metadata == {"camera_fingerprint": "camera-1"}
 
 
+def test_save_samples_write_failure_preserves_existing_archive_and_cleans_temp(
+    tmp_path, monkeypatch
+):
+    path = tmp_path / "samples.npz"
+    previous_samples = [_sample([1.0, 2.0, 3.0, 0.1, 0.2, 0.3], timestamp=4.0)]
+    previous_metadata = {"camera_fingerprint": "previous-camera", "serial": "OLD"}
+    math3d.save_samples(path, previous_samples, previous_metadata)
+    previous_bytes = path.read_bytes()
+
+    def fail_after_temp_creation(temp_path, **fields):
+        Path(temp_path).write_bytes(b"partial archive")
+        raise OSError("simulated write failure")
+
+    monkeypatch.setattr(np, "savez_compressed", fail_after_temp_creation)
+
+    with pytest.raises(OSError, match="simulated write failure"):
+        math3d.save_samples(
+            path,
+            _diverse_samples(),
+            {"camera_fingerprint": "new-camera", "serial": "NEW"},
+        )
+
+    assert path.read_bytes() == previous_bytes
+    loaded, metadata = math3d.load_samples(path, "previous-camera")
+    assert metadata == previous_metadata
+    assert loaded[0]["flange_pose"] == previous_samples[0]["flange_pose"]
+    assert list(tmp_path.iterdir()) == [path]
+
+
+def test_save_samples_replaces_existing_archive_and_cleans_temp(tmp_path):
+    path = tmp_path / "samples.npz"
+    math3d.save_samples(
+        path,
+        [_sample([1.0, 2.0, 3.0, 0.1, 0.2, 0.3], timestamp=4.0)],
+        {"camera_fingerprint": "previous-camera", "serial": "OLD"},
+    )
+
+    new_samples = _diverse_samples()
+    new_metadata = {"camera_fingerprint": "new-camera", "serial": "NEW"}
+    math3d.save_samples(path, new_samples, new_metadata)
+
+    loaded, metadata = math3d.load_samples(path, "new-camera")
+    assert metadata == new_metadata
+    assert len(loaded) == len(new_samples)
+    assert loaded[0]["flange_pose"] == new_samples[0]["flange_pose"]
+    assert list(tmp_path.iterdir()) == [path]
+
+
 def test_sample_persistence_rejects_fingerprint_mismatch_and_missing_fields(tmp_path):
     path = tmp_path / "samples.npz"
     math3d.save_samples(path, _diverse_samples(), {"camera_fingerprint": "camera-1"})

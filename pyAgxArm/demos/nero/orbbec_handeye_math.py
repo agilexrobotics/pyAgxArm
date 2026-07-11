@@ -6,6 +6,9 @@ and pose angles are radians using ZYX roll/pitch/yaw composition.
 
 import json
 import math
+import os
+from pathlib import Path
+import tempfile
 import zipfile
 from datetime import datetime, timezone
 from numbers import Integral, Real
@@ -341,15 +344,30 @@ def save_samples(path, samples, camera_metadata):
         target_tvecs = np.empty((0, 3, 1), dtype=np.float64)
         timestamps = np.empty((0,), dtype=np.float64)
 
-    np.savez_compressed(
-        path,
-        flange_poses=flange_poses,
-        target_rvecs=target_rvecs,
-        target_tvecs=target_tvecs,
-        timestamps=timestamps,
-        camera_fingerprint=np.asarray(camera_metadata["camera_fingerprint"]),
-        camera_metadata_json=np.asarray(metadata_json),
-    )
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            dir=path.parent, prefix=".{}-".format(path.name), suffix=".npz", delete=False
+        ) as temp_file:
+            temp_path = Path(temp_file.name)
+        np.savez_compressed(
+            temp_path,
+            flange_poses=flange_poses,
+            target_rvecs=target_rvecs,
+            target_tvecs=target_tvecs,
+            timestamps=timestamps,
+            camera_fingerprint=np.asarray(camera_metadata["camera_fingerprint"]),
+            camera_metadata_json=np.asarray(metadata_json),
+        )
+        os.replace(temp_path, path)
+    finally:
+        if temp_path is not None:
+            try:
+                temp_path.unlink()
+            except FileNotFoundError:
+                pass
 
 
 def _preflight_sample_archive(path):
