@@ -202,7 +202,7 @@ def test_detect_checkerboard_pose_returns_current_pnp_solution():
     assert ok is True
     assert corners.shape[0] == 70
     assert np.all(np.isfinite(rvec))
-    assert float(tvec[2]) > 0.0
+    assert float(tvec[2, 0]) > 0.0
 
 
 def test_failed_detection_returns_no_stale_pose():
