@@ -296,16 +296,24 @@ def calibrate_and_write(samples, metadata, args):
 
 
 def _metadata_compatible(saved, current):
-    if saved.get("camera_fingerprint") != current.get("camera_fingerprint"):
-        return False
     keys = (
+        "serial",
+        "firmware",
         "color_profile",
         "depth_profile",
         "color_intrinsics",
         "color_distortion",
+        "depth_intrinsics",
+        "depth_distortion",
+        "depth_scale_m",
         "T_color_depth_matrix",
     )
-    return all(saved.get(key) == current.get(key) for key in keys)
+    if not all(saved.get(key) == current.get(key) for key in keys):
+        return False
+    return (
+        "camera_fingerprint" not in saved
+        or saved["camera_fingerprint"] == current.get("camera_fingerprint")
+    )
 
 
 def load_existing_samples(path, camera_metadata, checkerboard, square_size_m):

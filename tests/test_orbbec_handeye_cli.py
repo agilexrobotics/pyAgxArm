@@ -20,6 +20,8 @@ import orbbec_handeye_calib as cli  # noqa: E402
 def _metadata(fingerprint="camera-1"):
     return {
         "camera_fingerprint": fingerprint,
+        "serial": "ABC123",
+        "firmware": "1.2.3",
         "color_profile": "1280x720@30_RGB",
         "depth_profile": "640x576@30_Y16",
         "color_intrinsics": {
@@ -31,6 +33,15 @@ def _metadata(fingerprint="camera-1"):
             "cy": 360.0,
         },
         "color_distortion": [0.1, -0.1, 0.0, 0.0, 0.01],
+        "depth_intrinsics": {
+            "width": 640,
+            "height": 576,
+            "fx": 580.0,
+            "fy": 581.0,
+            "cx": 320.0,
+            "cy": 288.0,
+        },
+        "depth_distortion": [0.01, -0.01, 0.0, 0.0, 0.001],
         "depth_scale_m": 0.001,
         "T_color_depth_matrix": np.eye(4).reshape(-1).tolist(),
     }
@@ -326,6 +337,78 @@ def test_resume_collection_rejects_checkerboard_geometry_mismatch(tmp_path, monk
 
     with pytest.raises(ValueError, match="checkerboard geometry"):
         cli.load_existing_samples(sample_path, _collection_metadata(), (10, 7), 0.02)
+
+
+def test_resume_collection_loads_compatible_samples(tmp_path, monkeypatch):
+    sample_path = tmp_path / "samples.npz"
+    sample_path.touch()
+    samples = [_sample()]
+    monkeypatch.setattr(
+        cli,
+        "load_samples",
+        lambda path, fingerprint: (samples, _collection_metadata()),
+    )
+
+    assert cli.load_existing_samples(
+        sample_path, _collection_metadata(), (10, 7), 0.02
+    ) == samples
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        (
+            "depth_intrinsics",
+            {
+                "width": 640,
+                "height": 576,
+                "fx": 579.0,
+                "fy": 581.0,
+                "cx": 320.0,
+                "cy": 288.0,
+            },
+        ),
+        ("depth_distortion", [0.02, -0.01, 0.0, 0.0, 0.001]),
+        ("depth_scale_m", 0.002),
+        ("firmware", "1.2.4"),
+    ],
+)
+def test_resume_collection_rejects_changed_depth_calibration_before_capture(
+    tmp_path, monkeypatch, field, value
+):
+    sample_path = tmp_path / "samples.npz"
+    sample_path.touch()
+    saved_metadata = _collection_metadata()
+    saved_metadata[field] = value
+
+    class Camera:
+        metadata = _metadata()
+
+        def start(self):
+            return self
+
+        def wait_for_frames(self):
+            return SimpleNamespace(color_bgr=np.zeros((20, 20, 3), dtype=np.uint8))
+
+        def stop(self):
+            pass
+
+    monkeypatch.setattr(
+        cli,
+        "load_samples",
+        lambda path, fingerprint: ([_sample()], saved_metadata),
+    )
+    monkeypatch.setattr(cli, "create_camera", lambda args: Camera())
+    monkeypatch.setattr(
+        cli, "create_nero_robot", lambda args: SimpleNamespace(disconnect=lambda: None)
+    )
+    monkeypatch.setattr(cli, "run_frame_loop", lambda *args: pytest.fail("capture started"))
+    monkeypatch.setattr(cli, "destroy_windows", lambda: None)
+
+    with pytest.raises(ValueError, match="incompatible with this camera profile"):
+        cli.run_collection(
+            cli.build_arg_parser().parse_args(["--samples", str(sample_path)])
+        )
 
 
 def test_collection_key_handler_rejects_stale_detection_and_preserves_metadata(tmp_path, monkeypatch):
