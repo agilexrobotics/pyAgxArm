@@ -4,8 +4,8 @@
 
 ## 范围与软件
 
-- 相机：Orbbec DaBai DCW；SDK：Orbbec SDK v1。
-- 官方源码：[OrbbecSDK](https://github.com/orbbec/OrbbecSDK)、[pyorbbecsdk](https://github.com/orbbec/pyorbbecsdk/tree/main)。使用 `pyorbbecsdk` 的 `main` 分支，Python 模块名为 `pyorbbecsdk`。
+- 相机：Orbbec DaBai DCW；它是遗留的 OpenNI 协议设备，选用支持它的 Orbbec SDK v1；SDK v2 不是本流程的选用路径。
+- 官方源码：[OrbbecSDK](https://github.com/orbbec/OrbbecSDK)、[pyorbbecsdk](https://github.com/orbbec/pyorbbecsdk/tree/main)。使用 `pyorbbecsdk` 的 `main` 分支，Python 模块名为 `pyorbbecsdk`。本指南测试的源码 revision 为 `ee32b475fdd3a433c568842597c55d29b385052e`。
 - 项目校准脚本：`pyAgxArm/demos/nero/orbbec_handeye_calib.py`。
 - `pytest` 只用于测试，不是运行校准程序的运行时依赖。
 
@@ -18,11 +18,13 @@ conda activate pyagxarm
 which python
 sudo apt update
 sudo apt install -y cmake build-essential python3-dev libusb-1.0-0-dev
-git clone --depth 1 --branch main https://github.com/orbbec/pyorbbecsdk.git
+git clone --branch main https://github.com/orbbec/pyorbbecsdk.git
 cd pyorbbecsdk
+git checkout ee32b475fdd3a433c568842597c55d29b385052e
 python -m pip install -r requirements.txt
 cmake -S . -B build \
   -DPython3_ROOT_DIR="$CONDA_PREFIX" \
+  -DCMAKE_INSTALL_PREFIX="$PWD/install" \
   -Dpybind11_DIR="$(pybind11-config --cmakedir)"
 cmake --build build -j"$(nproc)"
 cmake --install build
@@ -32,20 +34,27 @@ sudo udevadm control --reload-rules
 sudo udevadm trigger
 ```
 
+该 CMake 项目默认将 `CMAKE_INSTALL_PREFIX` 指向其源码目录下的 `install/`；这里仍显式设为 `"$PWD/install"`，以固定和显示安装位置。`cmake --install build` 会将构建产物写入克隆目录的 `install/`；随后 `python -m pip install .` 将该本地构建的绑定打包到当前 Conda Python。两步均不使用 `sudo`，只有 udev 规则脚本和规则刷新需要 `sudo`。如因兼容性选择更新的 revision，记录实际版本以保证可复现：
+
+```bash
+git rev-parse HEAD
+```
+
 安装或刷新 udev 规则后，拔下再插入 DaBai DCW，再验证：
 
 ```bash
 python examples/hello_orbbec.py
 ```
 
-当前环境中的 `opencv-contrib-python 5.0.0.93` 虽暴露了相关常量，却没有 `cv2.calibrateHandEye`。校准前安装稳定版本（或明确限制为 `<5`），并确认 API 存在：
+当前环境中的 `opencv-contrib-python 5.0.0.93` 虽暴露了相关常量，却没有 `cv2.calibrateHandEye`。校准前移除冲突 wheel，安装稳定版本（或明确限制为 `<5`），并确认 API 存在：
 
 ```bash
-python -m pip install --upgrade 'opencv-contrib-python==4.13.0.92'
+python -m pip uninstall -y opencv-python opencv-contrib-python opencv-python-headless opencv-contrib-python-headless
+python -m pip install --no-cache-dir opencv-contrib-python==4.13.0.92
 python -c 'import cv2; print(cv2.__version__, hasattr(cv2, "calibrateHandEye"))'
 ```
 
-最后一条必须输出 `True`。如项目中同时安装了其他 OpenCV wheel，先清理冲突版本后再只保留一个 `opencv-contrib-python`。
+最后一条必须显示版本并输出 `True`。
 
 ## CAN 与硬件预检
 
@@ -56,13 +65,20 @@ ip -details link show can_piper
 candump can_piper
 ```
 
-第一条输出应包含 `bitrate 1000000`；第二条在机器人已上电、总线接线正确且有报文时应持续显示流量。先断电再调整 CAN/电源接线，核对终端电阻、极性和共地；不要在接线或安装相机时给机械臂上电。本流程不发送任何自主运动命令：只在机器人处于安全、人工确认的静止姿态时读取法兰位姿。
+第一条输出应包含 `bitrate 1000000`；第二条在机器人已上电、总线接线正确且有报文时应持续显示流量，按 `Ctrl-C` 停止监听。`candump` 来自 `can-utils`；若命令不存在，安装它：
+
+```bash
+sudo apt install -y can-utils
+```
+
+先断电再调整 CAN/电源接线，核对终端电阻、极性和共地；不要在接线或安装相机时给机械臂上电。本流程不发送任何自主运动命令：只在机器人处于安全、人工确认的静止姿态时读取法兰位姿。
 
 ## 采集与求解
 
 将棋盘固定在工作空间内，使用 **10 x 7 个内角点**、方格边长 **0.02 m**。从仓库根目录运行：
 
 ```bash
+cd /path/to/pyAgxArm  # 替换为本仓库根目录
 conda activate pyagxarm
 python pyAgxArm/demos/nero/orbbec_handeye_calib.py \
   --checkerboard-cols 10 \
@@ -72,7 +88,7 @@ python pyAgxArm/demos/nero/orbbec_handeye_calib.py \
   --can-channel can_piper
 ```
 
-画面中棋盘被检测到后，在每个由操作者安全摆放并静止的姿态按键：
+画面中棋盘被检测到后，在每个由操作者安全摆放并静止的姿态按键。CLI 不对相机帧和机器人位姿做时间戳同步，严禁在机械臂运动时保存样本；严格执行“移动 -> 等待运动完成且机械臂静止 -> 观察稳定画面 -> 按 `s`”。
 
 - `s`：保存当前有效棋盘观测与当前法兰位姿。
 - `c`：求解并写入标定 JSON。
@@ -80,18 +96,31 @@ python pyAgxArm/demos/nero/orbbec_handeye_calib.py \
 
 采集 15--30 个样本。每次既要改变平移，也要围绕至少两个不共线的旋转轴改变姿态；只沿单一轴转动会被运动多样性检查拒绝，因为手眼方程退化，无法可靠估计完整的刚体变换。棋盘必须固定不动，采样时避免振动、遮挡、反光和运动模糊。
 
-默认样本文件为 `orbbec_handeye_samples.npz`，结果为 `orbbec_handeye_result.json`。每次 `s` 都会更新 NPZ，其中保存法兰位姿、棋盘 `rvec/tvec`、时间戳、相机序列号/流配置、RGB 与深度内参、畸变、深度比例、色深外参以及棋盘几何。`--samples captures/run1` 会自动补为 `captures/run1.npz`；指定非 `.npz` 扩展名会报错。恢复旧样本时，当前相机指纹、流配置、色深外参或棋盘内角点/方格尺寸不一致会被拒绝，应重新采集而不是混用。
+默认样本文件为 `orbbec_handeye_samples.npz`，结果为 `orbbec_handeye_result.json`。每次 `s` 都会更新 NPZ，其中保存法兰位姿、棋盘 `rvec/tvec`、时间戳、相机序列号/流配置、RGB 与深度内参、畸变、深度比例、色深外参以及棋盘几何。`--samples captures/run1` 会自动补为 `captures/run1.npz`；指定非 `.npz` 扩展名会报错。恢复旧样本时，当前相机指纹、流配置、色深外参或棋盘内角点/方格尺寸不一致会被拒绝，应重新采集而不是混用；归档中的棋盘几何是权威定义。
+
+恢复兼容样本并继续采集，已有 `existing_samples.npz` 会自动加载；之后每次 `s` 都向该归档追加样本：
+
+```bash
+cd /path/to/pyAgxArm  # 替换为本仓库根目录
+conda activate pyagxarm
+python pyAgxArm/demos/nero/orbbec_handeye_calib.py \
+  --samples existing_samples.npz \
+  --can-interface socketcan \
+  --can-channel can_piper
+```
 
 仅对已有样本重新求解：
 
 ```bash
+cd /path/to/pyAgxArm  # 替换为本仓库根目录
+conda activate pyagxarm
 python pyAgxArm/demos/nero/orbbec_handeye_calib.py \
   --calibrate-only \
   --samples captures/run1.npz \
   --output captures/run1_result.json
 ```
 
-结果 JSON 的 `T_color_depth`、`T_flange_color`、`T_flange_depth` 及其逆变换均会写出。所有平移和点坐标单位为米；每个变换的 `matrix_row_major_4x4` 是点转换的权威表示，XYZ/RPY 和四元数只供查看。检查 `sample_count`、`quality_warnings` 与 `consistency`，较大的棋盘基座位姿离散度表示应检查样本质量后重采。
+结果 JSON 的 `T_color_depth`、`T_flange_color`、`T_flange_depth` 及其逆变换均会写出。所有平移和点坐标单位为米；每个变换的 `matrix_row_major_4x4` 是点转换的权威表示，XYZ/RPY 和四元数只供查看。检查 `sample_count`、`quality_warnings` 与 `consistency`；一致性指标仅是诊断信息，不设未经验证的数值离散度阈值。以已知点的物理测量比较作为验收关口。
 
 ## 原始深度像素到基座
 
@@ -109,7 +138,7 @@ p_depth = [(u-cx)z/fx, (v-cy)z/fy, z]
 p_base = T_base_flange * T_flange_depth * p_depth
 ```
 
-从仓库根目录执行下例。它假设 `robot` 已按项目的 Nero 配置连接，`depth_raw_frame` 是当前 Orbbec 原始深度 `numpy` 数组；脚本目录显式加入导入路径，因此无需安装 demo 模块。
+从仓库根目录执行下例。它假设 `robot` 已按项目的 Nero 配置连接，`depth_raw_frame` 是当前 Orbbec 原始深度 `numpy` 数组；脚本目录显式加入导入路径，因此无需安装 demo 模块。CLI 不对相机帧和法兰位姿做时间戳同步：必须先移动，再等待运动完成且机械臂静止，然后在同一静止时段取得深度帧和当前 `T_base_flange`；机械臂运动时绝不能计算 `p_base`。
 
 ```python
 import json
@@ -151,7 +180,7 @@ print(point_base_m)
 | `No module named pyorbbecsdk` | 激活 `pyagxarm`，执行 `which python`，按上面的 v1 `main` 构建步骤重装，再运行 `python examples/hello_orbbec.py`。 |
 | `No device connected` 或权限错误 | 检查 USB 线和供电；重装/刷新 udev 规则后重新插拔相机。 |
 | 没有 `calibrateHandEye` | 安装 `opencv-contrib-python==4.13.0.92`，并以 `hasattr(cv2, "calibrateHandEye")` 确认 `True`。 |
-| `can_piper` 不存在或 `candump` 无报文 | 用 `ip -details link show can_piper` 检查接口和 1 Mbps，随后检查 CAN 适配器、终端电阻、接线、供电和机器人状态。 |
+| `can_piper` 不存在或 `candump` 无报文 | 如缺少 `candump` 先安装 `can-utils`；用 `ip -details link show can_piper` 检查接口和 1 Mbps，随后检查 CAN 适配器、终端电阻、接线、供电和机器人状态。 |
 | 棋盘无法检测 | 核对 10 x 7 是内角点而非方格数，保持 0.02 m 方格设置，改善照明、焦距、清晰度和完整可见性。 |
 | 样本多样性不足/同轴被拒绝 | 重采同时具有平移及至少两条不共线旋转轴的 15--30 个姿态。 |
 | 归档几何不匹配 | 不要修改旧 NPZ 的棋盘参数或混用相机配置；用当前棋盘和相机重新采集。 |
