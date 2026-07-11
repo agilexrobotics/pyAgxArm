@@ -2,6 +2,7 @@
 """Interactive Orbbec/Nero eye-in-hand calibration collection utility."""
 
 import argparse
+import copy
 import json
 import math
 from pathlib import Path
@@ -40,6 +41,55 @@ def build_arg_parser():
     parser.add_argument("--height", type=int, default=720)
     parser.add_argument("--fps", type=int, default=30)
     return parser
+
+
+def normalize_samples_path(path):
+    """Return an NPZ sample path without silently changing named extensions."""
+    path = Path(path)
+    if not path.suffix:
+        return path.with_suffix(".npz")
+    if path.suffix != ".npz":
+        raise ValueError("sample files must use .npz extension: {}".format(path))
+    return path
+
+
+def validate_checkerboard_args(args):
+    """Validate CLI checkerboard dimensions using the shared geometry convention."""
+    checkerboard = (args.checkerboard_cols, args.checkerboard_rows)
+    square_size_m = args.square_size
+    try:
+        create_checkerboard_object_points(checkerboard, square_size_m)
+    except OverflowError as exc:
+        raise ValueError(
+            "Checkerboard dimensions must contain exactly two finite positive integers."
+        ) from exc
+    return checkerboard, float(square_size_m)
+
+
+def collection_metadata(camera_metadata, args):
+    """Copy camera metadata and bind sample collection to one checkerboard geometry."""
+    checkerboard, square_size_m = validate_checkerboard_args(args)
+    metadata = copy.deepcopy(camera_metadata)
+    metadata["checkerboard"] = {
+        "inner_corners": [int(checkerboard[0]), int(checkerboard[1])],
+        "square_size_m": square_size_m,
+    }
+    return metadata
+
+
+def stored_checkerboard_geometry(metadata):
+    """Return the validated checkerboard geometry persisted with a sample archive."""
+    try:
+        geometry = metadata["checkerboard"]
+        checkerboard = tuple(geometry["inner_corners"])
+        square_size_m = geometry["square_size_m"]
+        create_checkerboard_object_points(checkerboard, square_size_m)
+    except (KeyError, TypeError, ValueError, OverflowError) as exc:
+        raise ValueError(
+            "stored checkerboard geometry is missing or malformed; recapture samples "
+            "with this CLI"
+        ) from exc
+    return (int(checkerboard[0]), int(checkerboard[1])), float(square_size_m)
 
 
 def _cv2():
@@ -231,12 +281,13 @@ def _color_depth_transform(metadata):
 
 def calibrate_and_write(samples, metadata, args):
     """Solve the current sample set and persist its JSON result."""
+    checkerboard, square_size_m = stored_checkerboard_geometry(metadata)
     result = calibrate_eye_in_hand(
         samples,
         _color_depth_transform(metadata),
         metadata,
-        checkerboard=(args.checkerboard_cols, args.checkerboard_rows),
-        square_size_m=args.square_size,
+        checkerboard=checkerboard,
+        square_size_m=square_size_m,
         method_name=args.method,
     )
     write_result_json(args.output, result)
@@ -257,7 +308,7 @@ def _metadata_compatible(saved, current):
     return all(saved.get(key) == current.get(key) for key in keys)
 
 
-def load_existing_samples(path, camera_metadata):
+def load_existing_samples(path, camera_metadata, checkerboard, square_size_m):
     """Load prior samples only when they belong to this same camera configuration."""
     path = Path(path)
     if not path.exists():
@@ -265,6 +316,14 @@ def load_existing_samples(path, camera_metadata):
     samples, saved_metadata = load_samples(path, camera_metadata["camera_fingerprint"])
     if not _metadata_compatible(saved_metadata, camera_metadata):
         raise ValueError("existing sample metadata is incompatible with this camera profile")
+    saved_checkerboard, saved_square_size_m = stored_checkerboard_geometry(saved_metadata)
+    if saved_checkerboard != tuple(checkerboard) or saved_square_size_m != float(
+        square_size_m
+    ):
+        raise ValueError(
+            "existing sample checkerboard geometry does not match the current "
+            "checkerboard settings"
+        )
     return samples
 
 
@@ -345,16 +404,19 @@ def run_collection(args):
     camera = None
     robot = None
     try:
+        checkerboard, square_size_m = validate_checkerboard_args(args)
         camera = create_camera(args)
         camera.start()
         initial_frames = camera.wait_for_frames()
-        metadata = camera.metadata
-        if not isinstance(metadata, dict):
+        if not isinstance(camera.metadata, dict):
             raise RuntimeError("Orbbec did not provide camera metadata with the first frame")
+        metadata = collection_metadata(camera.metadata, args)
         camera_matrix_and_distortion(metadata)
         _color_depth_transform(metadata)
         robot = create_nero_robot(args)
-        samples = load_existing_samples(args.samples, metadata)
+        samples = load_existing_samples(
+            args.samples, metadata, checkerboard, square_size_m
+        )
         print("Checkerboard: {}x{} inner corners, {:.6g} m squares.".format(args.checkerboard_cols, args.checkerboard_rows, args.square_size))
         print("Capture 15-30 poses with varied, non-collinear rotations for a reliable solve.")
         run_frame_loop(camera, initial_frames, robot, samples, metadata, args)
@@ -379,6 +441,8 @@ def run_collection(args):
 def main(argv=None):
     """Run the calibration command and return a shell-friendly status code."""
     args = build_arg_parser().parse_args(argv)
+    validate_checkerboard_args(args)
+    args.samples = normalize_samples_path(args.samples)
     if args.calibrate_only:
         samples, metadata = load_samples(args.samples)
         calibrate_and_write(samples, metadata, args)

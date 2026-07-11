@@ -36,6 +36,15 @@ def _metadata(fingerprint="camera-1"):
     }
 
 
+def _collection_metadata(checkerboard=(10, 7), square_size_m=0.02):
+    metadata = _metadata()
+    metadata["checkerboard"] = {
+        "inner_corners": list(checkerboard),
+        "square_size_m": square_size_m,
+    }
+    return metadata
+
+
 def _detection():
     return (
         True,
@@ -68,6 +77,49 @@ def test_parser_defaults_and_handeye_method_choices():
     assert (args.width, args.height, args.fps) == (1280, 720, 30)
     with pytest.raises(SystemExit):
         cli.build_arg_parser().parse_args(["--method", "NOPE"])
+
+
+def test_normalize_samples_path_appends_npz_and_rejects_other_suffixes():
+    assert cli.normalize_samples_path(Path("captures/handeye")) == Path(
+        "captures/handeye.npz"
+    )
+    assert cli.normalize_samples_path(Path("captures/handeye.npz")) == Path(
+        "captures/handeye.npz"
+    )
+    with pytest.raises(ValueError, match="must use .npz"):
+        cli.normalize_samples_path(Path("captures/handeye.json"))
+
+
+def test_validate_checkerboard_args_rejects_non_positive_values():
+    args = cli.build_arg_parser().parse_args(
+        ["--checkerboard-cols", "0", "--square-size", "nan"]
+    )
+
+    with pytest.raises(ValueError, match="Checkerboard dimensions"):
+        cli.validate_checkerboard_args(args)
+
+
+def test_validate_checkerboard_args_rejects_non_finite_integer_conversion():
+    args = cli.build_arg_parser().parse_args(["--checkerboard-cols", "1" + "0" * 400])
+
+    with pytest.raises(ValueError, match="Checkerboard dimensions"):
+        cli.validate_checkerboard_args(args)
+
+
+def test_collection_metadata_preserves_camera_data_and_records_geometry():
+    camera_metadata = _metadata()
+    args = cli.build_arg_parser().parse_args(
+        ["--checkerboard-cols", "8", "--checkerboard-rows", "6", "--square-size", "0.015"]
+    )
+
+    metadata = cli.collection_metadata(camera_metadata, args)
+
+    assert metadata["camera_fingerprint"] == "camera-1"
+    assert metadata["checkerboard"] == {
+        "inner_corners": [8, 6],
+        "square_size_m": 0.015,
+    }
+    assert "checkerboard" not in camera_metadata
 
 
 def test_import_and_help_do_not_load_optional_sdk_or_robot(monkeypatch, capsys):
@@ -176,7 +228,9 @@ def test_calibrate_only_uses_persisted_metadata_without_hardware(tmp_path, monke
     output_path = tmp_path / "result.json"
     captured = {}
 
-    monkeypatch.setattr(cli, "load_samples", lambda path: ([_sample()], _metadata()))
+    monkeypatch.setattr(
+        cli, "load_samples", lambda path: ([_sample()], _collection_metadata())
+    )
     monkeypatch.setattr(
         cli,
         "calibrate_eye_in_hand",
@@ -192,6 +246,86 @@ def test_calibrate_only_uses_persisted_metadata_without_hardware(tmp_path, monke
     assert captured["metadata"]["camera_fingerprint"] == "camera-1"
     np.testing.assert_allclose(captured["transform"], np.eye(4))
     assert json.loads(output_path.read_text(encoding="utf-8")) == {"result": "ok"}
+
+
+def test_calibrate_only_uses_saved_nondefault_checkerboard_geometry(tmp_path, monkeypatch):
+    captured = {}
+    metadata = _collection_metadata((8, 6), 0.015)
+    monkeypatch.setattr(cli, "load_samples", lambda path: ([_sample()], metadata))
+    monkeypatch.setattr(
+        cli,
+        "calibrate_eye_in_hand",
+        lambda samples, transform, camera_metadata, **kwargs: captured.update(kwargs)
+        or {"result": "ok"},
+    )
+
+    assert cli.main(
+        ["--calibrate-only", "--samples", str(tmp_path / "samples"), "--output", str(tmp_path / "result.json")]
+    ) == 0
+    assert captured["checkerboard"] == (8, 6)
+    assert captured["square_size_m"] == 0.015
+
+
+@pytest.mark.parametrize(
+    "stored_metadata",
+    [
+        _metadata(),
+        dict(_metadata(), checkerboard={"inner_corners": [8], "square_size_m": 0.02}),
+        dict(_metadata(), checkerboard={"inner_corners": [8, 6], "square_size_m": 0.0}),
+        dict(
+            _metadata(),
+            checkerboard={"inner_corners": [10 ** 400, 6], "square_size_m": 0.02},
+        ),
+    ],
+)
+def test_calibrate_only_rejects_missing_or_malformed_stored_geometry(
+    tmp_path, monkeypatch, stored_metadata
+):
+    monkeypatch.setattr(cli, "load_samples", lambda path: ([_sample()], stored_metadata))
+
+    with pytest.raises(ValueError, match="stored checkerboard geometry"):
+        cli.main(["--calibrate-only", "--samples", str(tmp_path / "samples")])
+
+
+def test_main_normalizes_samples_path_before_calibrate_only_load(tmp_path, monkeypatch):
+    captured = {}
+    monkeypatch.setattr(
+        cli,
+        "load_samples",
+        lambda path: captured.update(path=path) or ([_sample()], _collection_metadata()),
+    )
+    monkeypatch.setattr(cli, "calibrate_eye_in_hand", lambda *args, **kwargs: {"result": "ok"})
+
+    assert cli.main(
+        [
+            "--calibrate-only",
+            "--samples",
+            str(tmp_path / "samples"),
+            "--output",
+            str(tmp_path / "result.json"),
+        ]
+    ) == 0
+    assert captured["path"] == tmp_path / "samples.npz"
+
+
+def test_main_rejects_non_npz_samples_path_before_loading(monkeypatch):
+    monkeypatch.setattr(cli, "load_samples", lambda path: pytest.fail("samples loaded"))
+
+    with pytest.raises(ValueError, match="must use .npz"):
+        cli.main(["--calibrate-only", "--samples", "samples.json"])
+
+
+def test_resume_collection_rejects_checkerboard_geometry_mismatch(tmp_path, monkeypatch):
+    sample_path = tmp_path / "samples.npz"
+    sample_path.touch()
+    monkeypatch.setattr(
+        cli,
+        "load_samples",
+        lambda path, fingerprint: ([_sample()], _collection_metadata((8, 6), 0.015)),
+    )
+
+    with pytest.raises(ValueError, match="checkerboard geometry"):
+        cli.load_existing_samples(sample_path, _collection_metadata(), (10, 7), 0.02)
 
 
 def test_collection_key_handler_rejects_stale_detection_and_preserves_metadata(tmp_path, monkeypatch):
