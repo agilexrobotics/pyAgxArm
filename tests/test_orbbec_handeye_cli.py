@@ -85,7 +85,7 @@ def test_parser_defaults_and_handeye_method_choices():
     assert args.samples == Path("orbbec_handeye_samples.npz")
     assert args.output == Path("orbbec_handeye_result.json")
     assert args.method == "TSAI"
-    assert (args.width, args.height, args.fps) == (1280, 720, 30)
+    assert (args.width, args.height, args.fps, args.frame_timeout_ms) == (1280, 720, 30, 1000)
     with pytest.raises(SystemExit):
         cli.build_arg_parser().parse_args(["--method", "NOPE"])
 

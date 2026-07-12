@@ -17,6 +17,7 @@ import numpy as np
 
 
 _RIGID_TRANSFORM_ATOL = 1e-9
+_RIGID_TRANSFORM_INPUT_ATOL = 1e-6
 _ROTATION_AXIS_MIN_ANGLE_RAD = math.radians(1.0)
 _ROTATION_AXIS_CONDITIONING_MIN_RATIO = 0.05
 _SAMPLE_ARCHIVE_MEMBERS = {
@@ -145,13 +146,17 @@ def _validate_rigid_transform(transform):
         rotation.T @ rotation,
         np.eye(3),
         rtol=0.0,
-        atol=_RIGID_TRANSFORM_ATOL,
+        atol=_RIGID_TRANSFORM_INPUT_ATOL,
     ):
         raise ValueError("transform rotation must be orthonormal")
     if not np.isclose(
-        np.linalg.det(rotation), 1.0, rtol=0.0, atol=_RIGID_TRANSFORM_ATOL
+        np.linalg.det(rotation), 1.0, rtol=0.0, atol=_RIGID_TRANSFORM_INPUT_ATOL
     ):
         raise ValueError("transform rotation determinant must be +1")
+
+    result = result.copy()
+    u, _, vt = np.linalg.svd(rotation)
+    result[:3, :3] = u @ vt
     return result
 
 

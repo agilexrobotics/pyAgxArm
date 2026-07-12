@@ -57,12 +57,11 @@ def test_d2c_transform_is_depth_to_color_and_converts_mm_to_metres():
 
 
 def test_d2c_transform_accepts_a_valid_float32_rotation():
-    angle = np.pi / 5.0
     rotation = np.array(
         [
-            [np.cos(angle), -np.sin(angle), 0.0],
-            [np.sin(angle), np.cos(angle), 0.0],
-            [0.0, 0.0, 1.0],
+            [0.999997258, -0.002327133, 0.000345531],
+            [0.002327119, 0.999997318, 0.000041355],
+            [-0.000345626, -0.000040551, 0.999999940],
         ],
         dtype=np.float32,
     )
@@ -71,10 +70,21 @@ def test_d2c_transform_accepts_a_valid_float32_rotation():
     T_color_depth = camera.normalize_d2c_transform(sdk_transform)
 
     np.testing.assert_allclose(T_color_depth[:3, :3], rotation, atol=1e-7)
+    np.testing.assert_allclose(
+        T_color_depth[:3, :3].T @ T_color_depth[:3, :3],
+        np.eye(3),
+        rtol=0.0,
+        atol=1e-12,
+    )
+    assert np.linalg.det(T_color_depth[:3, :3]) == pytest.approx(1.0, abs=1e-12)
 
 
 def test_depth_scale_is_converted_from_sdk_mm_to_metres():
     assert camera.depth_scale_mm_to_m(1.0) == pytest.approx(0.001)
+
+
+def test_camera_default_frame_timeout_allows_usb_stream_startup():
+    assert camera.OrbbecV1Camera().timeout_ms == 1000
 
 
 class FakeProfiles:
@@ -427,10 +437,13 @@ class FakePipeline:
         self.depth_profiles = depth_profiles
         self.camera_param = camera_param
         self.frameset = frameset
+        self.frame_sets = None
+        self.wait_timeouts = []
         self.frame_sync_enabled = False
         self.started_config = None
         self.stop_count = 0
         self.start_error = None
+        self.frame_sync_error = None
 
     def get_stream_profile_list(self, sensor_type):
         if sensor_type == "COLOR_SENSOR":
@@ -439,6 +452,8 @@ class FakePipeline:
         return self.depth_profiles
 
     def enable_frame_sync(self):
+        if self.frame_sync_error is not None:
+            raise self.frame_sync_error
         self.frame_sync_enabled = True
 
     def start(self, config):
@@ -450,7 +465,9 @@ class FakePipeline:
         return self.camera_param
 
     def wait_for_frames(self, timeout_ms):
-        assert timeout_ms == 100
+        self.wait_timeouts.append(timeout_ms)
+        if self.frame_sets is not None:
+            return self.frame_sets.pop(0) if self.frame_sets else None
         return self.frameset
 
     def stop(self):
@@ -610,6 +627,63 @@ def test_camera_start_wait_metadata_and_idempotent_stop(monkeypatch):
     adapter.stop()
 
     assert pipeline.stop_count == 1
+
+
+def test_camera_start_continues_when_device_does_not_support_frame_sync(monkeypatch):
+    color_profile = FakeProfile(1280, 720, 30, "RGB")
+    depth_profile = FakeProfile(640, 480, 30, "Y16")
+    pipeline = FakePipeline(
+        FakeLifecycleProfiles(selected=color_profile),
+        FakeLifecycleProfiles(default=depth_profile),
+        make_camera_param(),
+    )
+    pipeline.frame_sync_error = RuntimeError("Current device does not support frame sync!")
+    config = FakeConfig()
+    sdk = make_fake_sdk([SimpleNamespace(serial="ABC")], pipeline, config)
+    monkeypatch.setattr(camera, "require_orbbec_sdk", lambda: sdk)
+
+    adapter = camera.OrbbecV1Camera().start()
+
+    assert adapter is not None
+    assert pipeline.frame_sync_enabled is False
+    assert pipeline.started_config is config
+    assert pipeline.stop_count == 0
+
+
+def test_camera_waits_for_complete_frame_set_after_initial_depth_only_frame(monkeypatch):
+    color_profile = FakeProfile(640, 480, 30, "RGB")
+    depth_profile = FakeProfile(640, 480, 30, "Y16")
+    color = FakeFrame(
+        2,
+        1,
+        FakeFormats.RGB,
+        np.array([[[3, 2, 1], [6, 5, 4]]], dtype=np.uint8).tobytes(),
+        timestamp=101,
+    )
+    depth = FakeDepthFrame(
+        2,
+        2,
+        "Y16",
+        np.array([[1, 2], [3, 4]], dtype=np.uint16).tobytes(),
+        timestamp=102,
+        depth_scale=10.0,
+    )
+    pipeline = FakePipeline(
+        FakeLifecycleProfiles(selected=color_profile),
+        FakeLifecycleProfiles(default=depth_profile),
+        make_camera_param(),
+    )
+    pipeline.frame_sets = [FakeFrameSet(None, depth), FakeFrameSet(color, depth)]
+    config = FakeConfig()
+    sdk = make_fake_sdk([SimpleNamespace(serial="ABC")], pipeline, config)
+    monkeypatch.setattr(camera, "require_orbbec_sdk", lambda: sdk)
+
+    adapter = camera.OrbbecV1Camera().start()
+    result = adapter.wait_for_frames()
+
+    assert result.color_timestamp_ms == 101
+    assert result.depth_timestamp_ms == 102
+    assert len(pipeline.wait_timeouts) == 2
 
 
 def test_camera_restart_replaces_metadata_and_profiles_with_second_run(monkeypatch):

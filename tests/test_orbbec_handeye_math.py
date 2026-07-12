@@ -189,6 +189,29 @@ def test_invert_transform_composes_to_identity():
     np.testing.assert_allclose(inverse @ transform, np.eye(4), atol=1e-15)
 
 
+def test_rigid_transform_normalizes_valid_float32_calibration_rotation():
+    transform = np.array(
+        [
+            [0.999997258, -0.002327133, 0.000345531, -0.012587452],
+            [0.002327119, 0.999997318, 0.000041355, 0.000032290],
+            [-0.000345626, -0.000040551, 0.999999940, -0.001149079],
+            [0.0, 0.0, 0.0, 1.0],
+        ],
+        dtype=np.float32,
+    )
+
+    normalized = math3d._validate_rigid_transform(transform)
+
+    np.testing.assert_allclose(normalized[:3, 3], transform[:3, 3], atol=0.0)
+    np.testing.assert_allclose(
+        normalized[:3, :3].T @ normalized[:3, :3],
+        np.eye(3),
+        rtol=0.0,
+        atol=1e-12,
+    )
+    assert np.linalg.det(normalized[:3, :3]) == pytest.approx(1.0, abs=1e-12)
+
+
 @pytest.mark.parametrize(
     "transform,error_pattern",
     [

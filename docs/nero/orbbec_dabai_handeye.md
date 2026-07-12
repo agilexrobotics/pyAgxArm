@@ -179,6 +179,7 @@ print(point_base_m)
 | --- | --- |
 | `No module named pyorbbecsdk` | 激活 `pyagxarm`，执行 `which python`，按上面的 v1 `main` 构建步骤重装，再运行 `python examples/hello_orbbec.py`。 |
 | `No device connected` 或权限错误 | 检查 USB 线和供电；重装/刷新 udev 规则后重新插拔相机。 |
+| `Timed out waiting for Orbbec frames` | DaBai DCW 在 USB 2.0 上启动首帧可能超过默认的 1000 ms；先重试，仍超时则追加 `--frame-timeout-ms 3000`。 |
 | 没有 `calibrateHandEye` | 安装 `opencv-contrib-python==4.13.0.92`，并以 `hasattr(cv2, "calibrateHandEye")` 确认 `True`。 |
 | `can_piper` 不存在或 `candump` 无报文 | 如缺少 `candump` 先安装 `can-utils`；用 `ip -details link show can_piper` 检查接口和 1 Mbps，随后检查 CAN 适配器、终端电阻、接线、供电和机器人状态。 |
 | 棋盘无法检测 | 核对 10 x 7 是内角点而非方格数，保持 0.02 m 方格设置，改善照明、焦距、清晰度和完整可见性。 |

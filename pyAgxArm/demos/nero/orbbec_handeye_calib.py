@@ -40,6 +40,7 @@ def build_arg_parser():
     parser.add_argument("--width", type=int, default=1280)
     parser.add_argument("--height", type=int, default=720)
     parser.add_argument("--fps", type=int, default=30)
+    parser.add_argument("--frame-timeout-ms", type=int, default=1000)
     return parser
 
 
@@ -151,6 +152,7 @@ def create_camera(args):
         color_width=args.width,
         color_height=args.height,
         fps=args.fps,
+        timeout_ms=args.frame_timeout_ms,
     )
 
 

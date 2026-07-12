@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import hashlib
 import json
 import math
+import time
 
 import numpy as np
 
@@ -67,6 +68,10 @@ def normalize_d2c_transform(extrinsic):
         np.linalg.det(rotation), 1.0, rtol=0.0, atol=_RIGID_TRANSFORM_ATOL
     ):
         raise ValueError("Orbbec depth-to-color rotation determinant must be +1")
+
+    # SDK v1 exposes float32 calibration; project its rounding error onto SO(3).
+    u, _, vt = np.linalg.svd(rotation)
+    rotation = u @ vt
 
     result = np.eye(4, dtype=np.float64)
     result[:3, :3] = rotation
@@ -294,9 +299,20 @@ def _select_device(devices, serial_number):
     return devices.get_device_by_index(0)
 
 
+def enable_frame_sync_if_supported(pipeline):
+    """Enable hardware frame sync when the selected camera supports it."""
+    try:
+        pipeline.enable_frame_sync()
+    except Exception as exc:
+        if "does not support frame sync" not in str(exc).lower():
+            raise
+        return False
+    return True
+
+
 @dataclass(frozen=True)
 class OrbbecFrames:
-    """A synchronized BGR color image and unscaled uint16 depth image."""
+    """A BGR color image and unscaled uint16 depth image from one frame set."""
 
     color_bgr: np.ndarray
     depth_raw: np.ndarray
@@ -314,7 +330,7 @@ class OrbbecV1Camera:
         color_width=1280,
         color_height=720,
         fps=30,
-        timeout_ms=100,
+        timeout_ms=1000,
     ):
         self.serial_number = serial_number
         self.color_width = int(color_width)
@@ -386,7 +402,7 @@ class OrbbecV1Camera:
             config.enable_stream(color_stream)
             config.enable_stream(depth_stream)
             config.set_align_mode(sdk.OBAlignMode.DISABLE)
-            pipeline.enable_frame_sync()
+            enable_frame_sync_if_supported(pipeline)
             pipeline.start(config)
             camera_param = pipeline.get_camera_param()
             device_info = device.get_device_info()
@@ -415,27 +431,38 @@ class OrbbecV1Camera:
         return self
 
     def wait_for_frames(self):
-        """Wait for synchronized frames and convert them to calibration inputs."""
+        """Wait for a complete color and depth frame set before converting it."""
         if not self._started or self._pipeline is None:
             raise RuntimeError("Orbbec camera has not been started")
 
-        frameset = self._pipeline.wait_for_frames(self.timeout_ms)
-        if frameset is None:
-            raise RuntimeError(
-                "Timed out waiting for Orbbec frames after {} ms".format(
-                    self.timeout_ms
-                )
-            )
-        color_frame = frameset.get_color_frame()
-        depth_frame = frameset.get_depth_frame()
-        if color_frame is None or depth_frame is None:
+        deadline = time.monotonic() + self.timeout_ms / 1000.0
+        color_frame = None
+        depth_frame = None
+        missing = None
+        while time.monotonic() < deadline:
+            remaining_ms = max(1, int(math.ceil((deadline - time.monotonic()) * 1000.0)))
+            frameset = self._pipeline.wait_for_frames(remaining_ms)
+            if frameset is None:
+                break
+            color_frame = frameset.get_color_frame()
+            depth_frame = frameset.get_depth_frame()
+            if color_frame is not None and depth_frame is not None:
+                break
             missing = []
             if color_frame is None:
                 missing.append("color")
             if depth_frame is None:
                 missing.append("depth")
+
+        if color_frame is None or depth_frame is None:
+            detail = ""
+            if missing:
+                detail = "; last frame set was missing {} frame".format(
+                    " and ".join(missing)
+                )
             raise RuntimeError(
-                "Orbbec frame set is missing {} frame".format(" and ".join(missing))
+                "Timed out waiting for complete Orbbec color and depth frames after {} ms{}"
+                .format(self.timeout_ms, detail)
             )
 
         import cv2
