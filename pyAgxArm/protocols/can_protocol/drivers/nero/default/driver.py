@@ -784,6 +784,42 @@ class Driver(ArmDriverAbstract):
         self._set_mode()
         self._msg_mode.move_mode = temp
 
+    def set_installation_pos(
+        self, pos: Literal['horizontal', 'left', 'right'] = 'horizontal'
+    ):
+        """Set base installation orientation.
+
+        Parameters
+        ----------
+        `pos`: Literal['horizontal', 'left', 'right']
+        - `OPTIONS.INSTALLATION_POS.HORIZONTAL`: horizontal installation (default)
+        - `OPTIONS.INSTALLATION_POS.LEFT`: left-side installation
+        - `OPTIONS.INSTALLATION_POS.RIGHT`: right-side installation
+
+        Raises
+        ------
+        ValueError
+            If `pos` is not in ['horizontal', 'left', 'right'].
+
+        Examples
+        --------
+        >>> robot.set_installation_pos(robot.OPTIONS.INSTALLATION_POS.HORIZONTAL)
+        >>> robot.set_installation_pos(robot.OPTIONS.INSTALLATION_POS.LEFT)
+        >>> robot.set_installation_pos(robot.OPTIONS.INSTALLATION_POS.RIGHT)
+        """
+        if pos not in self.OPTIONS.INSTALLATION_POS.value_list():
+            raise ValueError(
+                "Installation position should be in OPTIONS.INSTALLATION_POS: "
+                f"{self.OPTIONS.INSTALLATION_POS.value_list()}"
+            )
+        installation_pos = NeroDefaultDriverAPIProtoAdapter.installation_pos(pos)
+        self._msg_mode.installation_pos = installation_pos
+        temp = self._msg_mode.move_mode
+        self._msg_mode.move_mode = 255
+        self._set_mode()
+        self._msg_mode.installation_pos = 0
+        self._msg_mode.move_mode = temp
+
     def set_motion_mode(
         self,
         motion_mode: Literal['p', 'j', 'l', 'c', 'mit', 'js'] = 'p'

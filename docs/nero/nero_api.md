@@ -29,6 +29,7 @@
   - [Get Firmware Info — get_firmware()](#get-firmware-info--get_firmware)
 - [Parameter Settings](#parameter-settings)
   - [Set Speed Percent — set_speed_percent()](#set-speed-percent--set_speed_percent)
+  - [Set Installation Position — set_installation_pos()](#set-installation-position--set_installation_pos)
   - [Set Motion Mode — set_motion_mode()](#set-motion-mode--set_motion_mode)
 - [TCP Related](#tcp-related)
   - [Set TCP Offset — set_tcp_offset()](#set-tcp-offset--set_tcp_offset)
@@ -851,6 +852,36 @@ robot = AgxArmFactory.create_arm(cfg)
 robot.connect()
 
 robot.set_speed_percent(100)
+```
+
+---
+
+### Set Installation Position — `set_installation_pos()`
+
+**Description:** Set the installation position of the robotic arm. Supports horizontal, left-facing, and right-facing orientations.
+
+**Function Definition:**
+
+```python
+set_installation_pos(self, pos: Literal["horizontal", "left", "right"] = "horizontal") -> None
+```
+
+**Parameters:**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `pos` | `str` | Installation orientation, valid values: `'horizontal'` / `'left'` / `'right'`, default: `'horizontal'` (recommended to use `robot.OPTIONS.INSTALLATION_POS.xxx` constants) |
+
+**Usage Example:**
+
+```python
+from pyAgxArm import create_agx_arm_config, AgxArmFactory, ArmModel, NeroFW
+
+cfg = create_agx_arm_config(robot=ArmModel.NERO, firmeware_version=NeroFW.DEFAULT, channel="can0")
+robot = AgxArmFactory.create_arm(cfg)
+robot.connect()
+
+robot.set_installation_pos(robot.OPTIONS.INSTALLATION_POS.HORIZONTAL)
 ```
 
 ---
@@ -2348,6 +2379,7 @@ print("set_crash_protection_rating success =", success)
   - [读取固件信息 — get_firmware()](#读取固件信息--get_firmware)
 - [参数设定](#参数设定)
   - [设定运行速度 — set_speed_percent()](#设定运行速度--set_speed_percent)
+  - [设定安装位置 — set_installation_pos()](#设定安装位置--set_installation_pos)
   - [设定运动模式 — set_motion_mode()](#设定运动模式--set_motion_mode)
 - [TCP 相关](#tcp-相关)
   - [设置 TCP 偏移 — set_tcp_offset()](#设置-tcp-偏移--set_tcp_offset)
@@ -3168,6 +3200,36 @@ robot = AgxArmFactory.create_arm(cfg)
 robot.connect()
 
 robot.set_speed_percent(100)
+```
+
+---
+
+### 设定安装位置 — `set_installation_pos()`
+
+**功能说明：** 设定机械臂安装位置，支持水平、朝左和朝右三个方向。
+
+**函数定义：**
+
+```python
+set_installation_pos(self, pos: Literal["horizontal", "left", "right"] = "horizontal") -> None
+```
+
+**参数说明：**
+
+| 名称 | 类型 | 说明 |
+| --- | --- | --- |
+| `pos` | `str` | 安装方向，可选值：`'horizontal'` / `'left'` / `'right'`，默认：`'horizontal'`（建议使用 `robot.OPTIONS.INSTALLATION_POS.xxx` 常量） |
+
+**使用示例：**
+
+```python
+from pyAgxArm import create_agx_arm_config, AgxArmFactory, ArmModel, NeroFW
+
+cfg = create_agx_arm_config(robot=ArmModel.NERO, firmeware_version=NeroFW.DEFAULT, channel="can0")
+robot = AgxArmFactory.create_arm(cfg)
+robot.connect()
+
+robot.set_installation_pos(robot.OPTIONS.INSTALLATION_POS.HORIZONTAL)
 ```
 
 ---

@@ -40,6 +40,11 @@ from ....msgs.core import StrStruct
 
 class NeroDefaultDriverAPIOptions(DriverAPIOptions):
 
+    class INSTALLATION_POS(StrStruct):
+        HORIZONTAL = "horizontal"
+        LEFT = "left"
+        RIGHT = "right"
+
     class PAYLOAD(StrStruct):
         EMPTY = "empty"
         HALF = "half"
@@ -55,6 +60,12 @@ class NeroDefaultDriverAPIOptions(DriverAPIOptions):
 
 class NeroDefaultDriverAPIProtoAdapter(DriverAPIProtoAdapter):
 
+    _INSTALL_POS_CODE = {
+        NeroDefaultDriverAPIOptions.INSTALLATION_POS.HORIZONTAL: ArmMsgModeCtrl.Enums.InstallationPos.HORIZONTAL,
+        NeroDefaultDriverAPIOptions.INSTALLATION_POS.LEFT: ArmMsgModeCtrl.Enums.InstallationPos.LEFT,
+        NeroDefaultDriverAPIOptions.INSTALLATION_POS.RIGHT: ArmMsgModeCtrl.Enums.InstallationPos.RIGHT,
+    }
+
     _MOVE_CODE = {
         NeroDefaultDriverAPIOptions.MOTION_MODE.P: ArmMsgModeCtrl.Enums.MotionMode.P,
         NeroDefaultDriverAPIOptions.MOTION_MODE.J: ArmMsgModeCtrl.Enums.MotionMode.J,
@@ -68,6 +79,10 @@ class NeroDefaultDriverAPIProtoAdapter(DriverAPIProtoAdapter):
         NeroDefaultDriverAPIOptions.MOTION_MODE.MIT: ArmMsgModeCtrl.Enums.MitMode.MIT,
         NeroDefaultDriverAPIOptions.MOTION_MODE.JS: ArmMsgModeCtrl.Enums.MitMode.MIT,
     }
+
+    @classmethod
+    def installation_pos(cls, value: str) -> int:
+        return cls._INSTALL_POS_CODE[value]
 
     @classmethod
     def motion_mode(cls, value: str) -> Tuple[int, int]:
