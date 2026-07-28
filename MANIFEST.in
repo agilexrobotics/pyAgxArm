@@ -8,6 +8,8 @@ graft pyAgxArm/extensions
 graft pyAgxArm/scripts
 graft tests
 
+recursive-include pyAgxArm *.pyi py.typed
+
 prune .github
 prune .vscode
 global-exclude *.py[cod] __pycache__ .DS_Store
