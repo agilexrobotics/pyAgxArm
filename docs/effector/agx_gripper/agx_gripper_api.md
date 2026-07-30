@@ -387,8 +387,8 @@ move_gripper_m(self, value: float = 0.0, force: float = 1.0) -> None
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `value` | `float` | Target gripper width, unit: m (precision approx. \(1e^{-6}\) m) |
-| `force` | `float` | Target gripping force, unit: N (precision approx. \(1e^{-3}\) N) |
+| `value` | `float` | Target gripper width, unit: m (precision approx. 1e-6 m) |
+| `force` | `float` | Target gripping force, unit: N (precision approx. 1e-3 N) |
 
 **Usage Example:**
 
@@ -400,6 +400,9 @@ cfg = create_agx_arm_config(robot=ArmModel.PIPER, firmeware_version=PiperFW.DEFA
 robot = AgxArmFactory.create_arm(cfg)
 end_effector = robot.init_effector(robot.OPTIONS.EFFECTOR.AGX_GRIPPER)
 robot.connect()
+
+# Set the percentage of arm movement speed
+robot.set_speed_percent()
 
 # Open to 5cm, force 1N
 end_effector.move_gripper_m(value=0.05, force=1.0)
@@ -423,8 +426,8 @@ move_gripper_deg(self, value: float = 0.0, force: float = 1.0) -> None
 
 | Name | Type | Description |
 | --- | --- | --- |
-| `value` | `float` | Target gripper angle, unit: deg (precision approx. \(1e^{-3}\) deg) |
-| `force` | `float` | Target gripping force, unit: N (precision approx. \(1e^{-3}\) N) |
+| `value` | `float` | Target gripper angle, unit: deg (precision approx. 1e-3 deg) |
+| `force` | `float` | Target gripping force, unit: N (precision approx. 1e-3 N) |
 
 **Usage Example:**
 
@@ -964,8 +967,8 @@ move_gripper_m(self, value: float = 0.0, force: float = 1.0) -> None
 
 | 名称 | 类型 | 说明 |
 | --- | --- | --- |
-| `value` | `float` | 目标夹爪行程（开口宽度），单位：m（数值精度约 \(1e^{-6}\) m） |
-| `force` | `float` | 目标夹持力，单位：N（数值精度约 \(1e^{-3}\) N） |
+| `value` | `float` | 目标夹爪行程（开口宽度），单位：m（数值精度约 1e-6 m） |
+| `force` | `float` | 目标夹持力，单位：N（数值精度约 1e-3 N） |
 
 **使用示例：**
 
@@ -977,6 +980,9 @@ cfg = create_agx_arm_config(robot=ArmModel.PIPER, firmeware_version=PiperFW.DEFA
 robot = AgxArmFactory.create_arm(cfg)
 end_effector = robot.init_effector(robot.OPTIONS.EFFECTOR.AGX_GRIPPER)
 robot.connect()
+
+# 设置臂的运动速度百分比
+robot.set_speed_percent()
 
 # 张开到 5cm，力 1N
 end_effector.move_gripper_m(value=0.05, force=1.0)
@@ -1000,8 +1006,8 @@ move_gripper_deg(self, value: float = 0.0, force: float = 1.0) -> None
 
 | 名称 | 类型 | 说明 |
 | --- | --- | --- |
-| `value` | `float` | 目标夹爪角度，单位：deg（数值精度约 \(1e^{-3}\) deg） |
-| `force` | `float` | 目标夹持力，单位：N（数值精度约 \(1e^{-3}\) N） |
+| `value` | `float` | 目标夹爪角度，单位：deg（数值精度约 1e-3 deg） |
+| `force` | `float` | 目标夹持力，单位：N（数值精度约 1e-3 N） |
 
 **使用示例：**
 
