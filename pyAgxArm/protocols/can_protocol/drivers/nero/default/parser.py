@@ -185,37 +185,37 @@ class Parser(PiperParser):
                 0x251: (
                     "motor_state_1",
                     ArmMsgFeedbackHighSpd1,
-                    self._codec.decode_high_spd
+                    self._decode_high_spd_for_joint(1)
                 ),
                 0x252: (
                     "motor_state_2",
                     ArmMsgFeedbackHighSpd2,
-                    self._codec.decode_high_spd
+                    self._decode_high_spd_for_joint(2)
                 ),
                 0x253: (
                     "motor_state_3",
                     ArmMsgFeedbackHighSpd3,
-                    self._codec.decode_high_spd
+                    self._decode_high_spd_for_joint(3)
                 ),
                 0x254: (
                     "motor_state_4",
                     ArmMsgFeedbackHighSpd4,
-                    self._codec.decode_high_spd
+                    self._decode_high_spd_for_joint(4)
                 ),
                 0x255: (
                     "motor_state_5",
                     ArmMsgFeedbackHighSpd5,
-                    self._codec.decode_high_spd
+                    self._decode_high_spd_for_joint(5)
                 ),
                 0x256: (
                     "motor_state_6",
                     ArmMsgFeedbackHighSpd6,
-                    self._codec.decode_high_spd
+                    self._decode_high_spd_for_joint(6)
                 ),
                 0x257: (
                     "motor_state_7",
                     ArmMsgFeedbackHighSpd7,
-                    self._codec.decode_high_spd
+                    self._decode_high_spd_for_joint(7)
                 ),
                 0x267: (
                     "driver_state_7",

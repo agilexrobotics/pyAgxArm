@@ -1,5 +1,3 @@
-import can
-
 from typing import TYPE_CHECKING, Callable, Optional, List, Dict, Tuple, Type
 
 from typing_extensions import Final, Literal
@@ -90,18 +88,24 @@ class Codec:
     # -------------------------
     # Common codec helpers
     # -------------------------
-    def decode_high_spd(self, motor_state: ArmMsgFeedbackHighSpd, can_data: bytearray) -> None:
+    def decode_high_spd(
+        self,
+        motor_state: ArmMsgFeedbackHighSpd,
+        can_data: bytearray,
+        torque_scale: float = 1.0,
+    ) -> None:
         """高速反馈通用解码：写入 velocity/current/position"""
         motor_state.velocity = (
             nc.ConvertToNegative_16bit(nc.ConvertBytesToInt(can_data, 0, 2)) * 1e-3
         )
-        motor_state.current = (
+        current = (
             nc.ConvertToNegative_16bit(nc.ConvertBytesToInt(can_data, 2, 4)) * 1e-3
         )
+        motor_state.current = current
         motor_state.position = (
             nc.ConvertToNegative_32bit(nc.ConvertBytesToInt(can_data, 4, 8)) * 1e-3
         )
-        motor_state.torque = motor_state.current
+        motor_state.torque = current * torque_scale
 
     def decode_low_spd(self, driver_state: ArmMsgFeedbackLowSpd, can_data: bytearray) -> None:
         """低速反馈通用解码：写入 vol/foc_temp/motor_temp/foc_status_code/bus_current"""
@@ -376,7 +380,7 @@ class Codec:
 
         m.mode = mode
         m.type = type_code
-        m.value = value
+        m.value = float(value)
         m.type_value[m.type] = m.value
 
     # -------------------------
@@ -667,25 +671,21 @@ class Parser(TableDriven, ProtocolParserInterface):
         self._rx_map = self._build_rx_map()
         self._tx_map = self._build_tx_map()
 
-    # Add torque calculation to motor state messages
-    def parse_packet(self, rx_can_frame: can.Message) -> Optional[MessageAbstract]:
-        spec = self._rx_map.get(rx_can_frame.arbitration_id)
-        attr_name = spec[0] if spec is not None else None
-        cached = super().parse_packet(rx_can_frame)
-        if (
-            cached is not None
-            and attr_name
-            and attr_name.startswith("motor_state_")
-            and isinstance(cached.msg, ArmMsgFeedbackHighSpd)
-            and self._config
-        ):
+    def _decode_high_spd_for_joint(
+        self, joint_index: int
+    ) -> Callable[[object, bytearray], None]:
+        torque_scale = 1.0
+        if self._config:
             k_table = self._config.get("joint_torque_k")
             b_table = self._config.get("joint_torque_b")
-            if k_table and b_table:
-                idx = int(attr_name.rsplit("_", 1)[-1]) - 1
-                if 0 <= idx < len(k_table) and idx < len(b_table):
-                    cached.msg.torque *= k_table[idx] * b_table[idx]
-        return cached
+            idx = joint_index - 1
+            if k_table and b_table and 0 <= idx < len(k_table) and idx < len(b_table):
+                torque_scale = k_table[idx] * b_table[idx]
+
+        def decoder(m: ArmMsgFeedbackHighSpd, d: bytearray) -> None:
+            self._codec.decode_high_spd(m, d, torque_scale=torque_scale)
+
+        return decoder
 
     # -------------------------
     # Driver-side message builders (internal helpers)
@@ -822,32 +822,32 @@ class Parser(TableDriven, ProtocolParserInterface):
             0x251: (
                 "motor_state_1",
                 ArmMsgFeedbackHighSpd1,
-                self._codec.decode_high_spd
+                self._decode_high_spd_for_joint(1)
             ),
             0x252: (
                 "motor_state_2",
                 ArmMsgFeedbackHighSpd2,
-                self._codec.decode_high_spd
+                self._decode_high_spd_for_joint(2)
             ),
             0x253: (
                 "motor_state_3",
                 ArmMsgFeedbackHighSpd3,
-                self._codec.decode_high_spd
+                self._decode_high_spd_for_joint(3)
             ),
             0x254: (
                 "motor_state_4",
                 ArmMsgFeedbackHighSpd4,
-                self._codec.decode_high_spd
+                self._decode_high_spd_for_joint(4)
             ),
             0x255: (
                 "motor_state_5",
                 ArmMsgFeedbackHighSpd5,
-                self._codec.decode_high_spd
+                self._decode_high_spd_for_joint(5)
             ),
             0x256: (
                 "motor_state_6",
                 ArmMsgFeedbackHighSpd6,
-                self._codec.decode_high_spd
+                self._decode_high_spd_for_joint(6)
             ),
             0x261: (
                 "driver_state_1",
