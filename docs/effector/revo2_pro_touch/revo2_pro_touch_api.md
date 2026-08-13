@@ -1,10 +1,10 @@
-# Revo2 Touch API Documentation
+# Revo2 Pro and Revo2 Touch API Documentation
 
-> This document describes the **Revo2 Touch** capacitive tactile hand Python API (based on **`bc-stark-sdk`**).
+> This document describes the shared **Revo2 Pro** and **Revo2 Touch** Python API (based on **`bc-stark-sdk`**). Revo2 Touch inherits the complete Revo2 Pro API and adds capacitive touch operations.
 
 > **Note:** This driver bridges the official Revo2 hand SDK. For the full SDK API and usage, see [Advanced: run_sdk and client](#advanced-run_sdk-and-client).
 
-- [Switch to 中文](#revo2-touch-灵巧手-api-使用文档)
+- [Switch to 中文](#revo2-pro-与-revo2-touch-灵巧手-api-使用文档)
 - [Overview](#overview)
 - [Prerequisites](#prerequisites)
 - [Quick Start](#quick-start)
@@ -16,7 +16,7 @@
 - [Device Configuration](#device-configuration)
 - [Finger Motion Control](#finger-motion-control)
 - [Motor Status and Settings](#motor-status-and-settings)
-- [Capacitive Touch](#capacitive-touch)
+- [Capacitive Touch (Revo2 Touch only)](#capacitive-touch-revo2-touch-only)
 - [LED / Buzzer / Vibration](#led--buzzer--vibration)
 - [Device Discovery](#device-discovery)
 - [Advanced: run_sdk and client](#advanced-run_sdk-and-client)
@@ -26,13 +26,20 @@
 
 ## Overview
 
-Initialize Revo2 Touch:
+Choose the model when initializing the end effector:
 
 ```python
-hand = robot.init_effector(robot.OPTIONS.EFFECTOR.REVO2_TOUCH)
+effector = robot.OPTIONS.EFFECTOR.REVO2_PRO
+# For Revo2 Touch instead: effector = robot.OPTIONS.EFFECTOR.REVO2_TOUCH
+hand = robot.init_effector(effector)
 ```
 
 > The driver wraps **bc-stark-sdk** and communicates with the hand through the conversion board.
+
+| Capability | Revo2 Pro | Revo2 Touch |
+| --- | --- | --- |
+| Device, finger, motor, indicators and SDK bridge | Yes | Yes (inherited from Pro) |
+| Capacitive touch APIs | No | Yes |
 
 Read APIs often return `None` on failure; write APIs fail silently via `run_sdk` on timeout or error.
 
@@ -40,7 +47,7 @@ Read APIs often return `None` on failure; write APIs fail silently via `run_sdk`
 
 ## Prerequisites
 
-1. **Hardware (required):** **Revo2 Touch** hand connected to the **arm bus through the Agilex conversion board**
+1. **Hardware (required):** **Revo2 Pro or Revo2 Touch** connected to the **arm bus through the Agilex conversion board**
 2. **Connection:** Same bus / channel as the arm — see [CAN module manual](../../can_user.md)
 3. **Python package:**
 
@@ -65,7 +72,7 @@ cfg = create_agx_arm_config(
     channel="can0",
 )
 robot = AgxArmFactory.create_arm(cfg)
-hand = robot.init_effector(robot.OPTIONS.EFFECTOR.REVO2_TOUCH)
+hand = robot.init_effector(robot.OPTIONS.EFFECTOR.REVO2_PRO)
 robot.connect()
 ```
 
@@ -93,10 +100,6 @@ info = hand.get_device_info()
 if info is not None:
     print(info.description)
 
-item = hand.get_single_touch_sensor_status(1)
-if item is not None:
-    print(item.description)
-
 hand.set_finger_positions([500] * 6)
 
 robot.disconnect()
@@ -122,20 +125,22 @@ robot.disconnect()
 ## Create Instance and Connect
 
 ```python
-hand = robot.init_effector(robot.OPTIONS.EFFECTOR.REVO2_TOUCH)
+effector = robot.OPTIONS.EFFECTOR.REVO2_PRO  # or REVO2_TOUCH
+hand = robot.init_effector(effector)
 robot.connect()
 ```
 
 **`EFFECTOR` constant:**
 
 ```python
+REVO2_PRO: Final[Literal["revo2_pro"]] = "revo2_pro"
 REVO2_TOUCH: Final[Literal["revo2_touch"]] = "revo2_touch"
 ```
 
 > **Notes:**
 > 1. Call `init_effector` only once per arm session.
 > 2. Create the effector before `connect()` (recommended).
-> 3. **Prerequisite:** Revo2 Touch connected to the arm bus through the Agilex conversion board.
+> 3. **Prerequisite:** Revo2 Pro or Revo2 Touch connected through the Agilex conversion board.
 
 ---
 
@@ -266,9 +271,9 @@ pos = hand.get_finger_positions()
 
 ---
 
-## Capacitive Touch
+## Capacitive Touch (Revo2 Touch only)
 
-Revo2 Touch exposes **capacitive** tactile data (not Force3D / array pressure — use `run_sdk` for unwrapped SDK features if needed).
+These methods exist only on Revo2 Touch. Revo2 Pro intentionally does not expose touch APIs. Revo2 Touch provides **capacitive** tactile data (not Force3D / array pressure — use `run_sdk` for unwrapped SDK features if needed).
 
 | Method | Description |
 | --- | --- |
@@ -318,7 +323,7 @@ print(device_id if device_id is not None else "no hand found")
 
 ## Advanced: run_sdk and client
 
-### `run_sdk(fn, /, *args, **kwargs) -> T | None`
+### `run_sdk(fn, *args, **kwargs) -> T | None`
 
 Runs any `hand.client.<method>` on the SDK asyncio thread with automatic left/right routing and auto/failover handling.
 
@@ -345,7 +350,7 @@ Direct access to **bc-stark-sdk** `DeviceContext`. Prefer wrapped driver methods
 
 ## API Index
 
-All public methods on `revo2_touch` `Driver` (67):
+Revo2 Pro exposes 59 public methods. Revo2 Touch exposes 67: all 59 inherited methods plus the 8 touch methods below.
 
 | Category | Methods |
 | --- | --- |
@@ -358,34 +363,34 @@ All public methods on `revo2_touch` `Driver` (67):
 | Current | `set_finger_current`, `set_finger_currents`, `get_finger_currents` |
 | Status | `get_motor_status`, `get_motor_state` |
 | Settings | `get/set_finger_unit_mode`, `get_all_finger_settings`, `get/set_finger_settings`, min/max position/speed/current, protected currents, thumb aux lock |
-| Touch | `get_touch_sensor_*`, `touch_sensor_setup/reset/calibrate` |
+| Touch (Revo2 Touch only) | `get_touch_sensor_*`, `touch_sensor_setup/reset/calibrate` |
 | Indicators | LED / buzzer / vibration get/set |
 
 **Type aliases on class:** `FingerId`, `FingerUnitMode`, `LedColor`, `LedInfo`, `LedMode`, `MotorSettings`
 
 ---
 
-# Revo2 Touch 灵巧手 API 使用文档
+# Revo2 Pro 与 Revo2 Touch 灵巧手 API 使用文档
 
-> 本文档描述 **Revo2 Touch** 电容触觉灵巧手的 Python API（基于 **bc-stark-sdk**）。
+> 本文档统一描述 **Revo2 Pro** 和 **Revo2 Touch** 的 Python API（基于 **bc-stark-sdk**）。Revo2 Touch 继承 Revo2 Pro 的全部接口，并扩展电容触觉操作。
 
 > **提示：** 本 Driver 桥接了灵巧手官方 SDK。更多 SDK 能力与用法请参阅 [进阶：run_sdk 与 client](#进阶run_sdk-与-client)。
 
 ## 目录
 
-- [切换到 English](#revo2-touch-api-documentation)
+- [切换到 English](#revo2-pro-and-revo2-touch-api-documentation)
 - [概述](#概述)
 - [环境要求](#环境要求)
 - [快速开始](#快速开始)
 - [量程与手指顺序](#量程与手指顺序)
-- [创建实例并连接](#创建实例并连接-1)
+- [创建实例并连接](#创建实例并连接)
 - [左右手路由](#左右手路由)
 - [Driver 上的 SDK 类型](#driver-上的-sdk-类型)
 - [设备信息](#设备信息)
 - [设备配置](#设备配置)
 - [手指运动控制](#手指运动控制)
 - [电机状态与参数](#电机状态与参数)
-- [电容触觉](#电容触觉)
+- [电容触觉（仅-Revo2-Touch）](#电容触觉仅-revo2-touch)
 - [LED / 蜂鸣器 / 振动](#led--蜂鸣器--振动)
 - [设备发现](#设备发现)
 - [进阶：run_sdk 与 client](#进阶run_sdk-与-client)
@@ -395,13 +400,20 @@ All public methods on `revo2_touch` `Driver` (67):
 
 ## 概述
 
-初始化 Revo2 Touch：
+初始化时选择对应型号：
 
 ```python
-hand = robot.init_effector(robot.OPTIONS.EFFECTOR.REVO2_TOUCH)
+effector = robot.OPTIONS.EFFECTOR.REVO2_PRO
+# Revo2 Touch 则使用：effector = robot.OPTIONS.EFFECTOR.REVO2_TOUCH
+hand = robot.init_effector(effector)
 ```
 
 > Driver 封装 **bc-stark-sdk**，经转换板与灵巧手通信。
+
+| 能力 | Revo2 Pro | Revo2 Touch |
+| --- | --- | --- |
+| 设备、手指、电机、指示器和 SDK 桥接 | 支持 | 支持（继承 Pro） |
+| 电容触觉接口 | 不支持 | 支持 |
 
 读接口失败时多返回 `None`；写接口经 `run_sdk` 在超时/错误时静默失败。
 
@@ -409,7 +421,7 @@ hand = robot.init_effector(robot.OPTIONS.EFFECTOR.REVO2_TOUCH)
 
 ## 环境要求
 
-1. **硬件（必须）：** **Revo2 Touch 触觉手经 Agilex 转换板接入机械臂总线**
+1. **硬件（必须）：** **Revo2 Pro 或 Revo2 Touch 经 Agilex 转换板接入机械臂总线**
 2. **连接：** 与机械臂共用同一总线/通道，见 [CAN 模块手册](../../can_user.md)
 3. **依赖：** `pip install bc-stark-sdk`
 4. 必须 `robot.connect()` 启动读循环，才能正常收发灵巧手数据
@@ -425,7 +437,7 @@ from pyAgxArm import AgxArmFactory, ArmModel, NeroFW, create_agx_arm_config
 
 cfg = create_agx_arm_config(robot=ArmModel.NERO, firmeware_version=NeroFW.V112, channel="can0")
 robot = AgxArmFactory.create_arm(cfg)
-hand = robot.init_effector(robot.OPTIONS.EFFECTOR.REVO2_TOUCH)
+hand = robot.init_effector(robot.OPTIONS.EFFECTOR.REVO2_PRO)
 robot.connect()
 ```
 
@@ -448,10 +460,6 @@ hand.set_hand_side("right")  # 可选；默认自动探测左右手
 info = hand.get_device_info()
 if info is not None:
     print(info.description)
-
-item = hand.get_single_touch_sensor_status(1)
-if item is not None:
-    print(item.description)
 
 hand.set_finger_positions([500] * 6)
 
@@ -478,15 +486,16 @@ robot.disconnect()
 ## 创建实例并连接
 
 ```python
-hand = robot.init_effector(robot.OPTIONS.EFFECTOR.REVO2_TOUCH)
+effector = robot.OPTIONS.EFFECTOR.REVO2_PRO  # 或 REVO2_TOUCH
+hand = robot.init_effector(effector)
 robot.connect()
 ```
 
-常量：`REVO2_TOUCH = "revo2_touch"`。
+常量：`REVO2_PRO = "revo2_pro"`、`REVO2_TOUCH = "revo2_touch"`。
 
 > 1. 每次连接会话只应调用一次 `init_effector`。  
 > 2. 建议在 `connect()` 前创建末端。  
-> 3. **前提：** 经 Agilex 转换板接入机械臂总线 + Revo2 Touch。
+> 3. **前提：** Revo2 Pro 或 Revo2 Touch 经 Agilex 转换板接入机械臂总线。
 
 ---
 
@@ -564,9 +573,9 @@ hand.set_finger_positions_and_speeds([1000] * 6, [300] * 6)
 
 ---
 
-## 电容触觉
+## 电容触觉（仅 Revo2 Touch）
 
-Driver 封装的是 **电容触觉** 接口（不含 Force3D / 面阵压力；未封装能力可用 `run_sdk(hand.client.xxx)`）。
+以下方法仅 Revo2 Touch 提供，Revo2 Pro 不暴露触觉接口。Driver 封装的是 **电容触觉** 接口（不含 Force3D / 面阵压力；未封装能力可用 `run_sdk(hand.client.xxx)`）。
 
 | 方法 | 说明 |
 | --- | --- |
@@ -602,7 +611,7 @@ item = hand.get_single_touch_sensor_status(1)
 
 ## 进阶：run_sdk 与 client
 
-**`run_sdk(fn, /, *args, **kwargs)`** — 在 SDK 线程执行 `hand.client` 任意方法，自动处理左右手路由与 failover。
+**`run_sdk(fn, *args, **kwargs)`** — 在 SDK 线程执行 `hand.client` 任意方法，自动处理左右手路由与 failover。
 
 **`hand.client`** — 原始 `DeviceContext`；Driver 未封装的 SDK 能力（DFU、动作序列等）通过 `run_sdk` 调用。
 
@@ -622,4 +631,4 @@ hand.run_sdk(hand.client.set_finger_positions, [0, 500, 500, 500, 500, 500])
 
 ## API 索引
 
-公开方法共 **67** 个，分类见 [English API Index](#api-index)。类属性：`FingerId`、`FingerUnitMode`、`LedColor`、`LedInfo`、`LedMode`、`MotorSettings`。
+Revo2 Pro 共 **59** 个公开方法；Revo2 Touch 共 **67** 个，即继承 59 个公共方法并扩展 8 个触觉方法。分类见 [English API Index](#api-index)。类属性：`FingerId`、`FingerUnitMode`、`LedColor`、`LedInfo`、`LedMode`、`MotorSettings`。

@@ -15,6 +15,7 @@ class DriverAPIOptions:
 
         AGX_GRIPPER: Final[Literal["agx_gripper"]] = "agx_gripper"
         REVO2: Final[Literal["revo2"]] = "revo2"
+        REVO2_PRO: Final[Literal["revo2_pro"]] = "revo2_pro"
         REVO2_TOUCH: Final[Literal["revo2_touch"]] = "revo2_touch"
 
 class DriverAPIProtoAdapter:

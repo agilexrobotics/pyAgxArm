@@ -31,6 +31,8 @@ from .piper_x import (
 
 from .effector import AgxGripperDriverDefault
 from .effector import Revo2DriverDefault
+from .effector import Revo2ProDriverDefault
+from .effector import Revo2TouchDriverDefault
 
 __all__ = [
     # Robotic arm drivers
@@ -58,4 +60,6 @@ __all__ = [
     # Effector drivers
     'AgxGripperDriverDefault',
     'Revo2DriverDefault',
+    'Revo2ProDriverDefault',
+    'Revo2TouchDriverDefault',
 ]

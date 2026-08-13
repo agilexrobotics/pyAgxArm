@@ -32,7 +32,7 @@
 | Nero API | [docs/nero/nero_api.md](./docs/nero/nero_api.md#nero-api-documentation) |
 | AgxGripper API | [docs/effector/agx_gripper/agx_gripper_api.md](./docs/effector/agx_gripper/agx_gripper_api.md#agxgripper-api-documentation) |
 | Revo2 API | [docs/effector/revo2/revo2_api.md](./docs/effector/revo2/revo2_api.md#revo2-api-documentation) |
-| Revo2 Touch API | [docs/effector/revo2_touch/revo2_touch_api.md](./docs/effector/revo2_touch/revo2_touch_api.md#revo2-touch-api-documentation) |
+| Revo2 Pro / Touch API | [docs/effector/revo2_pro_touch/revo2_pro_touch_api.md](./docs/effector/revo2_pro_touch/revo2_pro_touch_api.md#revo2-pro-and-revo2-touch-api-documentation) |
 | CAN module manual | [docs/can_user.md](./docs/can_user.md#can-module-manual) |
 | Nero first-time CAN guide | [docs/nero/first_time_user_guide_can.md](./docs/nero/first_time_user_guide_can.md#nero-first-time-user-guide-can) |
 | WSL2 USB-CAN guide | [docs/wsl2_usb_can_guide.md](./docs/wsl2_usb_can_guide.md#wsl2-ubuntu-2204-complete-usb-can-setup-guide) |
@@ -183,7 +183,7 @@ while True:
 | Nero API | [docs/nero/nero_api.md](./docs/nero/nero_api.md#nero-机械臂-api-使用文档) |
 | AgxGripper API | [docs/effector/agx_gripper/agx_gripper_api.md](./docs/effector/agx_gripper/agx_gripper_api.md#agxgripper-夹爪-api-使用文档) |
 | Revo2 API | [docs/effector/revo2/revo2_api.md](./docs/effector/revo2/revo2_api.md#revo2-灵巧手-api-使用文档) |
-| Revo2 Touch API | [docs/effector/revo2_touch/revo2_touch_api.md](./docs/effector/revo2_touch/revo2_touch_api.md#revo2-touch-灵巧手-api-使用文档) |
+| Revo2 Pro / Touch API | [docs/effector/revo2_pro_touch/revo2_pro_touch_api.md](./docs/effector/revo2_pro_touch/revo2_pro_touch_api.md#revo2-pro-与-revo2-touch-灵巧手-api-使用文档) |
 | CAN 模块手册 | [docs/can_user.md](./docs/can_user.md#can-模块使用手册) |
 | Nero 首次使用 CAN 指南 | [docs/nero/first_time_user_guide_can.md](./docs/nero/first_time_user_guide_can.md#nero-首次使用指南can) |
 | WSL2 USB-CAN 使用指南 | [docs/wsl2_usb_can_guide.md](./docs/wsl2_usb_can_guide.md#wsl2-ubuntu-2204-连接-usb-can-模块完整指南) |

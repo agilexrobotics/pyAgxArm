@@ -9,7 +9,7 @@ read-loop via :class:`~.....comms.Can20CanfdRx`.
 import asyncio
 import threading
 import time
-from typing import Any, Coroutine, Optional, TypeVar
+from typing import Any, Coroutine, List, Optional, Tuple, TypeVar
 
 from .....comms import Can20CanfdRx, CanFdMessage
 from ....core.driver_context import DriverContext
@@ -37,7 +37,7 @@ DEFAULT_PROBE_TIMEOUT_MS = 500  # scan_canfd_devices
 def _require_sdk() -> None:
     if libstark is None:
         raise ImportError(
-            "bc-stark-sdk is required for Revo2 touch-hand SDK support. "
+            "bc-stark-sdk is required for Revo2 Pro/Touch SDK support. "
             "Install with: pip install bc-stark-sdk"
         ) from _IMPORT_ERROR
 
@@ -76,7 +76,7 @@ class LibStarkBridge:
         self._loop = asyncio.new_event_loop()
         self._loop_ready = threading.Event()
         self._loop_thread = threading.Thread(
-            target=self._run_event_loop, name="revo2-touch-sdk", daemon=True
+            target=self._run_event_loop, name="revo2-pro-sdk", daemon=True
         )
         self._client: Optional[DeviceContext] = None
         self._started = False
@@ -118,7 +118,7 @@ class LibStarkBridge:
 
     async def probe_slave_id(
         self,
-        candidate_ids: Optional[list[int]] = None,
+        candidate_ids: Optional[List[int]] = None,
         *,
         timeout_ms: int = DEFAULT_PROBE_TIMEOUT_MS,
     ) -> Optional[int]:
@@ -160,7 +160,7 @@ class LibStarkBridge:
         _slave_id: int,
         expected_can_id: int,
         _expected_frames: int,
-    ) -> tuple[int, bytes]:
+    ) -> Tuple[int, bytes]:
         # Called synchronously from SDK; blocks until read-loop feeds a match.
         expected_slave = _slave_id_from_can_id(expected_can_id)
         expected_master = _master_id_from_can_id(expected_can_id)

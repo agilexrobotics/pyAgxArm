@@ -24,6 +24,7 @@ from .....utiles.tf import (
 if TYPE_CHECKING:
     from ..effector.agx_gripper import AgxGripperDriverDefault
     from ..effector.revo2 import Revo2DriverDefault
+    from ..effector.revo2_pro import Revo2ProDriverDefault
     from ..effector.revo2_touch import Revo2TouchDriverDefault
 
 
@@ -153,6 +154,13 @@ class ArmDriverAbstract(ArmDriverInterface):
 
     @overload
     def init_effector(
+        self, effector: Literal["revo2_pro"]
+    ) -> "Revo2ProDriverDefault":
+        """Revo2 Pro end-effector driver."""
+        ...
+
+    @overload
+    def init_effector(
         self, effector: Literal["revo2_touch"]
     ) -> "Revo2TouchDriverDefault":
         """revo2 touch-hand end-effector driver.
@@ -181,6 +189,12 @@ class ArmDriverAbstract(ArmDriverInterface):
             from ..effector.revo2 import Revo2DriverDefault
 
             self._effector = Revo2DriverDefault(self._config, self.get_context())
+            return self._effector
+
+        if effector_kind == self.OPTIONS.EFFECTOR.REVO2_PRO:
+            from ..effector.revo2_pro import Revo2ProDriverDefault
+
+            self._effector = Revo2ProDriverDefault(self._config, self.get_context())
             return self._effector
 
         if effector_kind == self.OPTIONS.EFFECTOR.REVO2_TOUCH:
