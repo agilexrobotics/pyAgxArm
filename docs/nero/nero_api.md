@@ -7,6 +7,7 @@
 - [Switch to 中文](#nero-机械臂-api-使用文档)
 - [Import Module](#import-module)
 - [Firmware Version](#firmware-version)
+  - [Resolve Firmware Profile — resolve_firmware_profile()](#resolve-firmware-profile--resolve_firmware_profile)
 - [Create Instance and Connect](#create-instance-and-connect)
   - [Create Configuration — create_agx_arm_config()](#create-configuration--create_agx_arm_config)
   - [Create Arm Driver Instance — AgxArmFactory.create_arm()](#create-arm-driver-instance--agxarmfaborycreate_arm)
@@ -101,13 +102,32 @@ Check the arm firmware with [get_firmware()](#get-firmware-info--get_firmware) (
 
 > Version evolution, API availability, and behavioral differences: [Nero Firmware Reference](firmware_reference.md#nero-firmware-reference).
 
-**Usage Example (recommended — use constants for IDE auto-complete):**
+### Resolve Firmware Profile — `resolve_firmware_profile()`
+
+**Description:** Convert the Nero software version returned by `get_firmware()` to the SDK driver profile accepted by `create_agx_arm_config()`.
+
+**Function Definition:**
 
 ```python
-from pyAgxArm import create_agx_arm_config, AgxArmFactory, ArmModel, NeroFW
+resolve_firmware_profile(robot: str, firmware_version: str) -> str
+```
 
-# Firmware is 1.10, use NeroFW.DEFAULT
-cfg = create_agx_arm_config(robot=ArmModel.NERO, firmeware_version=NeroFW.DEFAULT, channel="can0")
+**Parameters:**
+
+| Parameter | Type | Description |
+| --- | --- | --- |
+| `robot` | `str` | Nero model: `ArmModel.NERO`. |
+| `firmware_version` | `str` | `software_version` returned by `get_firmware()`, such as `"1.20"`. |
+
+**Return Value:** `str` — matching `NeroFW` profile value, such as `"v120"`.
+
+**Example:**
+
+```python
+from pyAgxArm import create_agx_arm_config, AgxArmFactory, ArmModel, resolve_firmware_profile
+
+profile = resolve_firmware_profile(ArmModel.NERO, "1.20")
+cfg = create_agx_arm_config(robot=ArmModel.NERO, firmeware_version=profile, channel="can0")
 robot = AgxArmFactory.create_arm(cfg)
 robot.connect()
 ```
@@ -2327,6 +2347,7 @@ print("set_crash_protection_rating success =", success)
 - [切换到 English](#nero-api-documentation)
 - [导入模块](#导入模块)
 - [固件版本选择](#固件版本选择)
+  - [解析固件档位 — resolve_firmware_profile()](#解析固件档位--resolve_firmware_profile)
 - [创建实例并连接](#创建实例并连接)
   - [创建配置参数 — create_agx_arm_config()](#创建配置参数--create_agx_arm_config)
   - [创建机械臂 Driver 实例 — AgxArmFactory.create_arm()](#创建机械臂-driver-实例--agxarmfactorycreate_arm)
@@ -2421,13 +2442,32 @@ Nero 与 Piper 固件体系相互独立。SDK 通过 `create_agx_arm_config()` �
 
 > 版本演进、API 可用性与行为差异详见 [Nero 固件参考](firmware_reference.md#nero-固件参考)。
 
-**使用示例（推荐 — 使用常量类获得 IDE 自动补全）：**
+### 解析固件档位 — `resolve_firmware_profile()`
+
+**功能说明：** 将 `get_firmware()` 返回的 Nero 软件版本转换为 `create_agx_arm_config()` 接受的 SDK 驱动档位。
+
+**函数定义：**
 
 ```python
-from pyAgxArm import create_agx_arm_config, AgxArmFactory, ArmModel, NeroFW
+resolve_firmware_profile(robot: str, firmware_version: str) -> str
+```
 
-# 固件为 1.10，选择 NeroFW.DEFAULT
-cfg = create_agx_arm_config(robot=ArmModel.NERO, firmeware_version=NeroFW.DEFAULT, channel="can0")
+**参数：**
+
+| 参数 | 类型 | 说明 |
+| --- | --- | --- |
+| `robot` | `str` | Nero 机型：`ArmModel.NERO`。 |
+| `firmware_version` | `str` | `get_firmware()` 返回的 `software_version`，例如 `"1.20"`。 |
+
+**返回值：** `str` — 匹配的 `NeroFW` 档位值，例如 `"v120"`。
+
+**示例：**
+
+```python
+from pyAgxArm import create_agx_arm_config, AgxArmFactory, ArmModel, resolve_firmware_profile
+
+profile = resolve_firmware_profile(ArmModel.NERO, "1.20")
+cfg = create_agx_arm_config(robot=ArmModel.NERO, firmeware_version=profile, channel="can0")
 robot = AgxArmFactory.create_arm(cfg)
 robot.connect()
 ```

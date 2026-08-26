@@ -5,7 +5,7 @@ import time
 import argparse
 import os
 from platform import system
-from pyAgxArm import AgxArmFactory, create_agx_arm_config, PiperFW
+from pyAgxArm import AgxArmFactory, create_agx_arm_config, resolve_firmware_profile
 
 
 def resolve_can_backend():
@@ -52,13 +52,7 @@ while robot.get_firmware() is None:
     time.sleep(1)
 
 sv = robot.get_firmware()["software_version"]
-fw = PiperFW.DEFAULT
-if sv >= "S-V1.8-9":
-    fw = PiperFW.V189
-elif sv >= "S-V1.8-8":
-    fw = PiperFW.V188
-elif sv >= "S-V1.8-3":
-    fw = PiperFW.V183
+fw = resolve_firmware_profile(args.robot, sv)
 
 robot.disconnect()
 

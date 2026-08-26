@@ -16,6 +16,7 @@ First stable release of the Python SDK for Agilex robotic arms. This version uni
 - **CAN communication**: Unified `CanComm` implementation across Linux / macOS / Windows via `python-can`.
 - **Drivers & firmware variants**: Piper (`DEFAULT`, `v183`, `v188`, `v189`), Nero (`DEFAULT`, `v111`, `v112`, `v120`, `v121`); Piper H / L / X re-export versioned subpackages.
 - **Public API**: `ArmModel`, `PiperFW`, `NeroFW` in `arm_options`; extended `AgxArmFactory` registration; root package exports `__version__` and option enums.
+- **Firmware profile resolution**: Added the public `resolve_firmware_profile(robot, firmware_version)` API so applications can map the version returned by `get_firmware()` to the SDK-supported Piper/Nero driver profile without duplicating version rules.
 - **Effectors**: AgxGripper and Revo2 drivers and message parsers aligned with current protocol usage.
 - **Packaging (PEP 561)**: `py.typed`, package stubs (`*.pyi`), `license` metadata in PEP 621 table form for reliable builds on modern setuptools.
 - **Tests**: Virtual CAN slaves (`tests/slaves/`), pytest suite covering factory routing, Piper/Nero motion and reads, firmware query, Piper-specific limits/crash APIs, AgxGripper and Revo2; `tests/API_COVERAGE.md` documents covered APIs and local pytest commands.
@@ -53,6 +54,7 @@ First stable release of the Python SDK for Agilex robotic arms. This version uni
 - **CAN 通信**：在 Linux / macOS / Windows 上通过 `python-can` 统一 `CanComm` 实现。
 - **驱动与固件分支**：Piper（`DEFAULT`、`v183`、`v188`、`v189`）、Nero（`DEFAULT`、`v111`、`v112`、`v120`、`v121`）；Piper H / L / X 通过 `versions` 子包重导出。
 - **对外 API**：`arm_options` 中的 `ArmModel`、`PiperFW`、`NeroFW`；扩展 `AgxArmFactory` 注册表；根包导出 `__version__` 与选项枚举。
+- **固件档位解析**：新增公开接口 `resolve_firmware_profile(robot, firmware_version)`，应用可将 `get_firmware()` 返回的版本映射为 SDK 支持的 Piper/Nero 驱动档位，无需重复维护版本规则。
 - **末端**：AgxGripper、Revo2 驱动与解析与当前协议用法对齐。
 - **打包（PEP 561）**：`py.typed`、stub（`*.pyi`）、`pyproject.toml` 中采用 PEP 621 表格式 `license` 元数据，保证新版 setuptools / twine 校验通过。
 - **测试**：虚拟 CAN 从机（`tests/slaves/`）、pytest 覆盖工厂路由、Piper/Nero 运动与读取、固件查询、Piper 专有极限/防撞等接口、夹爪与灵巧手；`tests/API_COVERAGE.md` 记录 API 覆盖与本地测试命令。
