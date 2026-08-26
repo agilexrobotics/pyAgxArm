@@ -9,7 +9,7 @@ from ...versions.v112.driver import Driver as V112Driver
 
 
 class Driver(V112Driver):
-    """Nero CAN driver for firmware >= v120 (1.20).
+    """Nero CAN driver for firmware == v120 (1.20).
 
     Terminology
     -----------

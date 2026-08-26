@@ -13,6 +13,7 @@ _LOAD_CLASS_CASES = [
     (ArmModel.NERO, NeroFW.V111, "pyAgxArm.protocols.can_protocol.drivers.nero.versions.v111.driver"),
     (ArmModel.NERO, NeroFW.V112, "pyAgxArm.protocols.can_protocol.drivers.nero.versions.v112.driver"),
     (ArmModel.NERO, NeroFW.V120, "pyAgxArm.protocols.can_protocol.drivers.nero.versions.v120.driver"),
+    (ArmModel.NERO, NeroFW.V121, "pyAgxArm.protocols.can_protocol.drivers.nero.versions.v121.driver"),
     (ArmModel.PIPER_H, PiperFW.DEFAULT, "pyAgxArm.protocols.can_protocol.drivers.piper_h.default.driver"),
     (ArmModel.PIPER_H, PiperFW.V183, "pyAgxArm.protocols.can_protocol.drivers.piper_h.versions.v183.driver"),
     (ArmModel.PIPER_H, PiperFW.V188, "pyAgxArm.protocols.can_protocol.drivers.piper_h.versions.v188.driver"),
@@ -48,6 +49,7 @@ def test_load_class_routes_to_expected_driver_module(robot, fw, expected_module)
         (NeroFW.V111, False),
         (NeroFW.V112, True),
         (NeroFW.V120, True),
+        (NeroFW.V121, True),
     ],
 )
 def test_nero_motion_mode_options_cpv_on_v112_and_v120(fw, expect_cpv):

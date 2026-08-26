@@ -93,7 +93,8 @@ Check the arm firmware with [get_firmware()](#get-firmware-info--get_firmware) (
 
 | Your firmware | `firmeware_version` | Constant |
 | --- | --- | --- |
-| 1.20 or later | `"v120"` | `NeroFW.V120` |
+| 1.21 or later | `"v121"` | `NeroFW.V121` |
+| 1.20 | `"v120"` | `NeroFW.V120` |
 | 1.12 | `"v112"` | `NeroFW.V112` |
 | 1.11 | `"v111"` | `NeroFW.V111` |
 | 1.10 or earlier | `"default"` (or omit) | `NeroFW.DEFAULT` |
@@ -142,7 +143,7 @@ create_agx_arm_config(
 | --- | --- | --- |
 | `robot` | `str` | Robotic arm model. Use `ArmModel` constants: `ArmModel.NERO` / `ArmModel.PIPER` / `ArmModel.PIPER_H` / `ArmModel.PIPER_L` / `ArmModel.PIPER_X` (raw strings also accepted) |
 | `comm` | `str` | Communication type. Options: `"can"` (default). Note: `comm` is not the CAN channel name; the CAN channel is specified by `channel` |
-| `firmeware_version` | `str` | Main controller firmware version. Use per-robot constants: Nero series → `NeroFW.DEFAULT` / `NeroFW.V111` / `NeroFW.V112` / `NeroFW.V120`. See [Firmware Version](#firmware-version). Default `"default"` |
+| `firmeware_version` | `str` | Main controller firmware version. Use per-robot constants: Nero series → `NeroFW.DEFAULT` / `NeroFW.V111` / `NeroFW.V112` / `NeroFW.V120` / `NeroFW.V121`. See [Firmware Version](#firmware-version). Default `"default"` |
 
 **Optional Keyword Arguments (`**kwargs`):**
 
@@ -2412,7 +2413,8 @@ Nero 与 Piper 固件体系相互独立。SDK 通过 `create_agx_arm_config()` �
 
 | 固件版本 | `firmeware_version` | 常量 |
 | --- | --- | --- |
-| 1.20 及更新 | `"v120"` | `NeroFW.V120` |
+| 1.21 及更新 | `"v121"` | `NeroFW.V121` |
+| 1.20 | `"v120"` | `NeroFW.V120` |
 | 1.12 | `"v112"` | `NeroFW.V112` |
 | 1.11 | `"v111"` | `NeroFW.V111` |
 | 1.10 及更早 | `"default"`（或不填） | `NeroFW.DEFAULT` |
@@ -2461,7 +2463,7 @@ create_agx_arm_config(
 | --- | --- | --- |
 | `robot` | `str` | 机械臂型号。推荐使用 `ArmModel` 常量：`ArmModel.NERO` / `ArmModel.PIPER` / `ArmModel.PIPER_H` / `ArmModel.PIPER_L` / `ArmModel.PIPER_X`（也兼容原始字符串） |
 | `comm` | `str` | 通讯类型，可选值：`"can"`（默认）。注意：`comm` 不是 CAN 通道名，CAN 通道由 `channel` 指定 |
-| `firmeware_version` | `str` | 主控固件版本。推荐使用按机型分类的常量：Nero 系列 → `NeroFW.DEFAULT` / `NeroFW.V111` / `NeroFW.V112` / `NeroFW.V120`。选择方法见[固件版本选择](#固件版本选择)。默认 `"default"` |
+| `firmeware_version` | `str` | 主控固件版本。推荐使用按机型分类的常量：Nero 系列 → `NeroFW.DEFAULT` / `NeroFW.V111` / `NeroFW.V112` / `NeroFW.V120` / `NeroFW.V121`。选择方法见[固件版本选择](#固件版本选择)。默认 `"default"` |
 
 **可选关键字参数（`**kwargs`）：**
 

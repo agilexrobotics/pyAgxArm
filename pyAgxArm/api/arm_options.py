@@ -52,7 +52,8 @@ class NeroFW:
     DEFAULT  <= 1.10
     V111     1.11
     V112     1.12
-    V120     >= 1.20
+    V120     1.20
+    V121     >= 1.21
     ======== ========================
 
     Use::
@@ -65,3 +66,4 @@ class NeroFW:
     V111: Final[Literal["v111"]] = "v111"
     V112: Final[Literal["v112"]] = "v112"
     V120: Final[Literal["v120"]] = "v120"
+    V121: Final[Literal["v121"]] = "v121"

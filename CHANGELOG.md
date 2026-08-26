@@ -14,7 +14,7 @@ First stable release of the Python SDK for Agilex robotic arms. This version uni
 ### Features
 
 - **CAN communication**: Unified `CanComm` implementation across Linux / macOS / Windows via `python-can`.
-- **Drivers & firmware variants**: Piper (`DEFAULT`, `v183`, `v188`), Nero (`DEFAULT`, `v111`, `v112`); Piper H / L / X re-export versioned subpackages.
+- **Drivers & firmware variants**: Piper (`DEFAULT`, `v183`, `v188`, `v189`), Nero (`DEFAULT`, `v111`, `v112`, `v120`, `v121`); Piper H / L / X re-export versioned subpackages.
 - **Public API**: `ArmModel`, `PiperFW`, `NeroFW` in `arm_options`; extended `AgxArmFactory` registration; root package exports `__version__` and option enums.
 - **Effectors**: AgxGripper and Revo2 drivers and message parsers aligned with current protocol usage.
 - **Packaging (PEP 561)**: `py.typed`, package stubs (`*.pyi`), `license` metadata in PEP 621 table form for reliable builds on modern setuptools.
@@ -51,7 +51,7 @@ First stable release of the Python SDK for Agilex robotic arms. This version uni
 ### 特性
 
 - **CAN 通信**：在 Linux / macOS / Windows 上通过 `python-can` 统一 `CanComm` 实现。
-- **驱动与固件分支**：Piper（`DEFAULT`、`v183`、`v188`）、Nero（`DEFAULT`、`v111`、`v112`）；Piper H / L / X 通过 `versions` 子包重导出。
+- **驱动与固件分支**：Piper（`DEFAULT`、`v183`、`v188`、`v189`）、Nero（`DEFAULT`、`v111`、`v112`、`v120`、`v121`）；Piper H / L / X 通过 `versions` 子包重导出。
 - **对外 API**：`arm_options` 中的 `ArmModel`、`PiperFW`、`NeroFW`；扩展 `AgxArmFactory` 注册表；根包导出 `__version__` 与选项枚举。
 - **末端**：AgxGripper、Revo2 驱动与解析与当前协议用法对齐。
 - **打包（PEP 561）**：`py.typed`、stub（`*.pyi`）、`pyproject.toml` 中采用 PEP 621 表格式 `license` 元数据，保证新版 setuptools / twine 校验通过。

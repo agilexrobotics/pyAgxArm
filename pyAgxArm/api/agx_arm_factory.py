@@ -15,6 +15,7 @@ from ..protocols.can_protocol.drivers import (
     NeroDriverV111,
     NeroDriverV112,
     NeroDriverV120,
+    NeroDriverV121,
     PiperDriverDefault,
     PiperDriverV183,
     PiperDriverV188,
@@ -61,11 +62,12 @@ def create_agx_arm_config(
 
     comm : str
         Communication type. Currently only ``"can"`` is supported.
+
     firmeware_version : str
         Main controller firmware version. Use per-robot-series
         constants for IDE hints:
 
-        **Piper series** (piper / piper_h / piper_l / piper_x) — ``PiperFW``::
+        Piper series (piper / piper_h / piper_l / piper_x) — ``PiperFW``::
 
             from pyAgxArm import PiperFW
             PiperFW.DEFAULT  # firmware ≤ S-V1.8-2
@@ -73,13 +75,14 @@ def create_agx_arm_config(
             PiperFW.V188     # firmware = S-V1.8-8
             PiperFW.V189     # firmware ≥ S-V1.8-9
 
-        **Nero series** — ``NeroFW``::
+        Nero series — ``NeroFW``::
 
             from pyAgxArm import NeroFW
             NeroFW.DEFAULT   # firmware ≤ 1.10
             NeroFW.V111      # firmware = 1.11
-            NeroFW.V112      # firmware 1.12
-            NeroFW.V120      # firmware ≥ 1.20
+            NeroFW.V112      # firmware = 1.12
+            NeroFW.V120      # firmware = 1.20
+            NeroFW.V121      # firmware ≥ 1.21
 
         String literals equal to ``PiperFW`` / ``NeroFW`` member values are also
         accepted (backward-compatible; see ``arm_options.py`` for the full list).
@@ -169,6 +172,7 @@ class AgxArmFactory:
                 "v111": NeroDriverV111,
                 "v112": NeroDriverV112,
                 "v120": NeroDriverV120,
+                "v121": NeroDriverV121,
             },
         },
         "piper_h": {
@@ -214,7 +218,7 @@ class AgxArmFactory:
         comm    : can
         firmeware_version :
             Piper 系列: default / v183 / v188 / v189
-            Nero 系列 : default / v111 / v112 / v120
+            Nero 系列 : default / v111 / v112 / v120 / v121
         """
         cls._registry.setdefault(robot, {})
         cls._registry[robot].setdefault(comm, {})

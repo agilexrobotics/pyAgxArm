@@ -12,7 +12,8 @@ Read top to bottom: each row is **what changed vs the previous SDK driver**.
 
 | SDK driver | Constant | Arm firmware | Changes vs previous driver |
 | --- | --- | --- | --- |
-| `v120` | `NeroFW.V120` | ≥ 1.20 | **Fixed:** `get_motor_states` returns real `velocity` (no zeroing). **Fixed:** `get_cpv_vel` without joint velocity sign flip. Inherits `v112` (CPV, IK, leader/follower, etc.). `move_mit` / `move_cpv_vel` still flip velocity sign on joints 1–7 except joint 6 (not fixed in 1.20). |
+| `v121` | `NeroFW.V121` | ≥ 1.21 | **Fixed:** `move_mit` and `move_cpv_vel` keep the requested velocity sign on every joint. Inherits `v120`. |
+| `v120` | `NeroFW.V120` | 1.20 | **Fixed:** `get_motor_states` returns real `velocity` (no zeroing). **Fixed:** `get_cpv_vel` without joint velocity sign flip. Inherits `v112` (CPV, IK, leader/follower, etc.). `move_mit` / `move_cpv_vel` still flip velocity sign on joints 1–7 except joint 6. |
 | `v112` | `NeroFW.V112` | 1.12 | **New:** `get_ik_joint_angles`; CPV (`0x181`–`0x187`); `set_motion_mode('cpv')`. **Changed:** `get_leader_joint_angles` → `0x155`–`0x170`. **Changed:** leader/follower only (Piper-aligned); default follower; CAN push at power-up; `set_normal_mode` removed (SDK no-op). Inherits `v111`. |
 | `v111` | `NeroFW.V111` | 1.11 | **New:** `calibrate_joint`. **Changed:** `move_mit` 12-bit `t_ff` (±16 N·m all joints); MIT frame without CRC; motion mode encoding; `move_p` / `get_flange_pose` without 1.10 pose workaround; `get_motor_states` only forces `velocity = 0` (no `current` flip). |
 | `default` | `NeroFW.DEFAULT` | ≤ 1.10 | **Baseline:** 8-bit `t_ff`; per-joint MIT torque ranges; 1.10 pose workaround on `move_p` / `get_flange_pose`; `get_motor_states` forces `velocity = 0` and negates `current`; leader feedback on `0x501`–`0x507`. No `calibrate_joint`, no CPV public APIs. |
@@ -23,7 +24,8 @@ Read top to bottom: each row is **what changed vs the previous SDK driver**.
 
 | Your firmware (from `get_firmware()`) | `firmeware_version` | Constant |
 | --- | --- | --- |
-| 1.20 or later | `"v120"` | `NeroFW.V120` |
+| 1.21 or later | `"v121"` | `NeroFW.V121` |
+| 1.20 | `"v120"` | `NeroFW.V120` |
 | 1.12 | `"v112"` | `NeroFW.V112` |
 | 1.11 | `"v111"` | `NeroFW.V111` |
 | 1.10 or earlier | `"default"` (or omit) | `NeroFW.DEFAULT` |
@@ -53,6 +55,7 @@ All other public APIs in [nero_api.md](nero_api.md#nero-api-documentation) are a
 | `V111` | 1–7 | All: ±16 | 12 | `v_des` sign flip except joint 6 (firmware workaround) |
 | `V112` | 1–7 | Same as `V111` | 12 | Inherits `v111` `move_mit` |
 | `V120` | 1–7 | Same as `V112` | 12 | Inherits `v112` `move_mit` (`v_des` sign flip except joint 6; not fixed in 1.20) |
+| `V121` | 1–7 | Same as `V120` | 12 | No `v_des` sign flip |
 
 ---
 
@@ -78,20 +81,27 @@ Legend: **✅** supported · **—** not in driver · **⚠️** supported with 
 
 ## Version-Specific Behavior (full)
 
-| Topic | `DEFAULT` (≤ 1.10) | `V111` (1.11) | `V112` (1.12) | `V120` (≥ 1.20) |
-| --- | --- | --- | --- | --- |
-| **`move_p` / `get_flange_pose`** | 1.10 pose workaround (send + receive) | No workaround | Inherits `V111` | Inherits `V112` |
-| **`get_motor_states`** | `velocity = 0`; `current` negated | `velocity = 0` only | Inherits `V111` | Real `velocity`; no workarounds |
-| **`get_cpv_vel`** | — | — | Sign flip for joints ≠ 6 | No sign flip |
-| **`get_leader_joint_angles` CAN** | `0x501`–`0x507` per joint | Same as `DEFAULT` | `0x155` / `0x156` / `0x157` + `0x170` | Inherits `V112` |
-| **Leader–follower / CAN feedback** | normal + leader + follower; CAN push via `set_normal_mode` when enabled | Same as `DEFAULT` | leader + follower only (Piper-aligned); default follower; CAN push at power-up; `set_normal_mode` no-op | Inherits `V112` |
-| **CPV** | Not implemented | Not implemented | Full stack; `0x181`–`0x187` | Inherits `V112` |
+| Topic | `DEFAULT` (≤ 1.10) | `V111` (1.11) | `V112` (1.12) | `V120` (1.20) | `V121` (≥ 1.21) |
+| --- | --- | --- | --- | --- | --- |
+| **`move_p` / `get_flange_pose`** | 1.10 pose workaround (send + receive) | No workaround | Inherits `V111` | Inherits `V112` | Inherits `V120` |
+| **`get_motor_states`** | `velocity = 0`; `current` negated | `velocity = 0` only | Inherits `V111` | Real `velocity`; no workarounds | Inherits `V120` |
+| **`move_mit` velocity** | Firmware-specific | Sign flip for joints ≠ 6 | Inherits `V111` | Inherits `V112` | No sign flip |
+| **`move_cpv_vel` velocity** | — | — | Sign flip for joints ≠ 6 | Inherits `V112` | No sign flip |
+| **`get_cpv_vel`** | — | — | Sign flip for joints ≠ 6 | No sign flip | Inherits `V120` |
+| **`get_leader_joint_angles` CAN** | `0x501`–`0x507` per joint | Same as `DEFAULT` | `0x155` / `0x156` / `0x157` + `0x170` | Inherits `V112` | Inherits `V120` |
+| **Leader–follower / CAN feedback** | normal + leader + follower; CAN push via `set_normal_mode` when enabled | Same as `DEFAULT` | leader + follower only (Piper-aligned); default follower; CAN push at power-up; `set_normal_mode` no-op | Inherits `V112` | Inherits `V120` |
+| **CPV** | Not implemented | Not implemented | Full stack; `0x181`–`0x187` | Inherits `V112` | Inherits `V120` |
 
 ---
 
 ## Per-Version Quick Reference
 
-### Firmware ≥ 1.20 → use `NeroFW.V120`
+### Firmware ≥ 1.21 → use `NeroFW.V121`
+
+- Inherits all `V120` APIs and feedback fixes.
+- `move_mit` and `move_cpv_vel` keep the requested velocity sign on every joint.
+
+### Firmware 1.20 → use `NeroFW.V120`
 
 - Inherits all `V112` APIs (IK, CPV, leader/follower).
 - `get_motor_states` returns real joint velocity.
@@ -132,7 +142,8 @@ Legend: **✅** supported · **—** not in driver · **⚠️** supported with 
 
 | SDK 驱动 | 常量 | 机械臂固件 | 相对上一版的变化 |
 | --- | --- | --- | --- |
-| `v120` | `NeroFW.V120` | ≥ 1.20 | **修复：** `get_motor_states` 返回真实 `velocity`（不再置 0）。**修复：** `get_cpv_vel` 不再做关节速度符号翻转。继承 `v112`（CPV、IK、主从等）。`move_mit` / `move_cpv_vel` 仍对 1–7 轴中除第 6 轴外做速度符号 workaround（1.20 未修复）。 |
+| `v121` | `NeroFW.V121` | ≥ 1.21 | **修复：** `move_mit` 和 `move_cpv_vel` 对所有关节都保持调用者传入的速度符号。继承 `v120`。 |
+| `v120` | `NeroFW.V120` | 1.20 | **修复：** `get_motor_states` 返回真实 `velocity`（不再置 0）。**修复：** `get_cpv_vel` 不再做关节速度符号翻转。继承 `v112`（CPV、IK、主从等）。`move_mit` / `move_cpv_vel` 仍对 1–7 轴中除第 6 轴外做速度符号 workaround。 |
 | `v112` | `NeroFW.V112` | 1.12 | **新增：** `get_ik_joint_angles`；CPV（`0x181`–`0x187`）；`set_motion_mode('cpv')`。**变更：** `get_leader_joint_angles` → `0x155`–`0x170`。**变更：** 仅主从模式（与 Piper 一致）；默认从臂；上电 CAN 推送；取消 `set_normal_mode`（SDK no-op）。继承 `v111`。 |
 | `v111` | `NeroFW.V111` | 1.11 | **新增：** `calibrate_joint`。**变更：** `move_mit` 12-bit `t_ff`（全关节 ±16 N·m）；MIT 帧无 CRC；运动模式编码变更；`move_p` / `get_flange_pose` 无 1.10 位姿 workaround；`get_motor_states` 仅将 `velocity` 置 0（不再对 `current` 取反）。 |
 | `default` | `NeroFW.DEFAULT` | ≤ 1.10 | **基线：** 8-bit `t_ff`；分关节 MIT 力矩范围；`move_p` / `get_flange_pose` 1.10 位姿 workaround；`get_motor_states` 将 `velocity` 置 0 且 `current` 取反；主臂反馈 `0x501`–`0x507`。无 `calibrate_joint`、无 CPV 公开 API。 |
@@ -143,7 +154,8 @@ Legend: **✅** supported · **—** not in driver · **⚠️** supported with 
 
 | 固件版本（`get_firmware()`） | `firmeware_version` | 常量 |
 | --- | --- | --- |
-| 1.20 及更新 | `"v120"` | `NeroFW.V120` |
+| 1.21 及更新 | `"v121"` | `NeroFW.V121` |
+| 1.20 | `"v120"` | `NeroFW.V120` |
 | 1.12 | `"v112"` | `NeroFW.V112` |
 | 1.11 | `"v111"` | `NeroFW.V111` |
 | 1.10 及更早 | `"default"`（或不填） | `NeroFW.DEFAULT` |
@@ -173,6 +185,7 @@ Legend: **✅** supported · **—** not in driver · **⚠️** supported with 
 | `V111` | 1–7 | 全关节 ±16 | 12 | 除 6 轴外 `v_des` 取反（固件 workaround） |
 | `V112` | 1–7 | 与 `V111` 相同 | 12 | 继承 `v111` `move_mit` |
 | `V120` | 1–7 | 与 `V112` 相同 | 12 | 继承 `v112` `move_mit`（除第 6 轴外 `v_des` 取反；1.20 未修复） |
+| `V121` | 1–7 | 与 `V120` 相同 | 12 | `v_des` 不取反 |
 
 ---
 
@@ -198,20 +211,27 @@ Legend: **✅** supported · **—** not in driver · **⚠️** supported with 
 
 ## 版本差异说明（完整）
 
-| 主题 | `DEFAULT`（≤ 1.10） | `V111`（1.11） | `V112`（1.12） | `V120`（≥ 1.20） |
-| --- | --- | --- | --- | --- |
-| **`move_p` / `get_flange_pose`** | 1.10 位姿 workaround（收发） | 无 workaround | 继承 `V111` | 继承 `V112` |
-| **`get_motor_states`** | `velocity = 0`；`current` 取反 | 仅 `velocity = 0` | 继承 `V111` | 真实 `velocity`；无 workaround |
-| **`get_cpv_vel`** | — | — | 关节 ≠ 6 时符号翻转 | 无符号翻转 |
-| **`get_leader_joint_angles` CAN** | `0x501`–`0x507` 逐轴 | 与 `DEFAULT` 相同 | `0x155` / `0x156` / `0x157` + `0x170` | 继承 `V112` |
-| **主从 / CAN 反馈** | 正常+主从；使能后 `set_normal_mode` 开 CAN 推送 | 与 `DEFAULT` 相同 | 仅主从（同 Piper）；默认从臂；上电 CAN 推送；`set_normal_mode` no-op | 继承 `V112` |
-| **CPV** | 未实现 | 未实现 | 完整；`0x181`–`0x187` | 继承 `V112` |
+| 主题 | `DEFAULT`（≤ 1.10） | `V111`（1.11） | `V112`（1.12） | `V120`（1.20） | `V121`（≥ 1.21） |
+| --- | --- | --- | --- | --- | --- |
+| **`move_p` / `get_flange_pose`** | 1.10 位姿 workaround（收发） | 无 workaround | 继承 `V111` | 继承 `V112` | 继承 `V120` |
+| **`get_motor_states`** | `velocity = 0`；`current` 取反 | 仅 `velocity = 0` | 继承 `V111` | 真实 `velocity`；无 workaround | 继承 `V120` |
+| **`move_mit` 速度** | 固件特定 | 关节 ≠ 6 时取反 | 继承 `V111` | 继承 `V112` | 不取反 |
+| **`move_cpv_vel` 速度** | — | — | 关节 ≠ 6 时取反 | 继承 `V112` | 不取反 |
+| **`get_cpv_vel`** | — | — | 关节 ≠ 6 时符号翻转 | 无符号翻转 | 继承 `V120` |
+| **`get_leader_joint_angles` CAN** | `0x501`–`0x507` 逐轴 | 与 `DEFAULT` 相同 | `0x155` / `0x156` / `0x157` + `0x170` | 继承 `V112` | 继承 `V120` |
+| **主从 / CAN 反馈** | 正常+主从；使能后 `set_normal_mode` 开 CAN 推送 | 与 `DEFAULT` 相同 | 仅主从（同 Piper）；默认从臂；上电 CAN 推送；`set_normal_mode` no-op | 继承 `V112` | 继承 `V120` |
+| **CPV** | 未实现 | 未实现 | 完整；`0x181`–`0x187` | 继承 `V112` | 继承 `V120` |
 
 ---
 
 ## 分版本用户速查
 
-### 固件 ≥ 1.20 → `NeroFW.V120`
+### 固件 ≥ 1.21 → `NeroFW.V121`
+
+- 继承 `V120` 全部 API 和反馈修复。
+- `move_mit` 和 `move_cpv_vel` 对所有关节保持调用者传入的速度符号。
+
+### 固件 1.20 → `NeroFW.V120`
 
 - 继承 `V112` 全部 API（IK、CPV、主从）。
 - `get_motor_states` 返回真实关节速度。

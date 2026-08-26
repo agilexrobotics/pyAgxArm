@@ -584,6 +584,7 @@ class Driver(V111Driver):
         - Desired joint velocity in rad/s.
         """
         # TODO: remove this after the bug is fixed
+        # corrected in version 1.21
         if joint_index != 6:
             vel *= -1
 
@@ -661,7 +662,7 @@ class Driver(V111Driver):
 
         # TODO: remove this after the bug is fixed
         # corrected in version 1.20
-        if joint_index != 6:
+        if vel is not None and joint_index != 6:
             vel *= -1
 
         return vel

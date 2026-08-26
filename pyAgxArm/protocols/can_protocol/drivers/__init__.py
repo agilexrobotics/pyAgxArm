@@ -3,6 +3,7 @@ from .nero import (
     NeroDriverV111,
     NeroDriverV112,
     NeroDriverV120,
+    NeroDriverV121,
 )
 from .piper import (
     PiperDriverDefault,
@@ -40,6 +41,7 @@ __all__ = [
     'NeroDriverV111',
     'NeroDriverV112',
     'NeroDriverV120',
+    'NeroDriverV121',
     'PiperDriverDefault',
     'PiperDriverV183',
     'PiperDriverV188',

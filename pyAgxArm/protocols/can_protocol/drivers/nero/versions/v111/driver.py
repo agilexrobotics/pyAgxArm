@@ -286,6 +286,7 @@ class Driver(DefaultDriver):
             p_des = Validator.clamp(p_des, lower_limit, upper_limit)
 
         # TODO: remove this after the bug is fixed
+        # corrected in version 1.21
         if joint_index != 6:
             v_des *= -1
 
