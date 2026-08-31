@@ -5,6 +5,7 @@ from .....msgs.core import MessageAbstract
 from .....msgs.nero.default import (
     ArmMsgFeedbackHighSpd,
 )
+from .....msgs.piper.default import ArmMsgFeedbackCPVResponse
 from ...versions.v112.driver import Driver as V112Driver
 
 
@@ -80,6 +81,20 @@ class Driver(V112Driver):
             return None
 
     # -------------------------- CPV --------------------------
+
+    def _cpv_write_ack_received(
+        self,
+        msg: MessageAbstract[ArmMsgFeedbackCPVResponse],
+        type_: Literal['ac', 'dc', 'vv', 'pp', 'kp', 'ki'],
+    ) -> bool:
+        return msg.msg.write_ack
+
+    def _clear_cpv_write_ack(
+        self,
+        msg: MessageAbstract[ArmMsgFeedbackCPVResponse],
+        type_: Literal['ac', 'dc', 'vv', 'pp', 'kp', 'ki'],
+    ) -> None:
+        msg.msg.write_ack = False
 
     def get_cpv_vel(
         self,

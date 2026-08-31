@@ -299,6 +299,12 @@ class PiperCanSlave:
         ji = aid - 0x180
         if mode_byte == 0x77:
             self._cpv_store[(ji, type_str)] = raw
+            if type_str in ("ac", "dc", "vv", "pp", "kp", "ki"):
+                return [can.Message(
+                    is_extended_id=False,
+                    arbitration_id=aid,
+                    data=bytes([0xAC]),
+                )]
             out_raw = raw
         else:
             out_raw = self._cpv_store.get((ji, type_str), 0)

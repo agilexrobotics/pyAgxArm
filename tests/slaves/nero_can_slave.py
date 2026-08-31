@@ -39,6 +39,7 @@ class NeroCanSlave:
         self._proactive_burst_sent = False
         self._proactive_refresh = False
         self._cpv_reply_enabled = True
+        self._cpv_write_ack_style = "structured"
         self._cpv_store: dict = {}
 
     def start(self):
@@ -223,8 +224,14 @@ class NeroCanSlave:
         ji = aid - 0x180
         if mode_byte == 0x77:
             self._cpv_store[(ji, type_str)] = raw
-            # Nero: set-parameter write ack uses 172 (0xAC); po/sp move cmds echo raw.
+            # CPV parameter write ACK; po/sp commands echo the raw value.
             if type_str in ("ac", "dc", "vv", "pp", "kp", "ki"):
+                if self._cpv_write_ack_style == "single":
+                    return [can.Message(
+                        is_extended_id=False,
+                        arbitration_id=aid,
+                        data=bytes([0xAC]),
+                    )]
                 out_raw = 172
             else:
                 out_raw = raw

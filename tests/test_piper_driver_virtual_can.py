@@ -239,7 +239,14 @@ def test_piper_driver_virtual_can_cpv_move_get_set_and_scaling():
         assert got_sp is not None
         assert abs(got_sp - vel) < 1e-6
 
+        start = len(device.host_frames)
         assert arm.set_cpv_acc(3, 1.25, timeout=1.0)
+        set_frames = [
+            f for f in device.host_frames[start:]
+            if f.arbitration_id == 0x183 and bytes(f.data[1:3]) == b"ac"
+        ]
+        assert any(f.data[0] == 0x77 for f in set_frames)
+        assert not any(f.data[0] == 0x72 for f in set_frames)
         acc = arm.get_cpv_acc(3, timeout=1.0, min_interval=0.0)
         assert acc is not None and abs(acc - 1.25) < 1e-6
 

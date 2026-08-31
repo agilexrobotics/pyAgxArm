@@ -504,6 +504,9 @@ class Driver(V111Driver):
         value = round(abs(value) * self._cpv_set_scale(type_))
 
         def request() -> None:
+            msg = getattr(self._parser, f"cpv_response_{joint_index}", None)
+            if msg is not None:
+                self._clear_cpv_write_ack(msg, type_)
             self._cpv_po_joints_flag(joint_index)
             self._maybe_set_motion_mode('cpv')
             self._send_msg(
@@ -516,20 +519,13 @@ class Driver(V111Driver):
             )
 
         def get_msg() -> Optional[MessageAbstract[ArmMsgFeedbackCPVResponse]]:
-            return getattr(
-                self._parser,
-                f"cpv_response_{joint_index}",
-                None
-            )
+            return getattr(self._parser, f"cpv_response_{joint_index}", None)
 
         def is_ready() -> bool:
             msg = get_msg()
-            if msg is None:
+            if msg is None or not self._cpv_write_ack_received(msg, type_):
                 return False
-            if msg.msg.type_value.get(type_) != 172:
-                return False
-            # Clears the 172 (0xAC) write-ack entry after success.
-            msg.msg.type_value.pop(type_, None)
+            self._clear_cpv_write_ack(msg, type_)
             return True
 
         return bool(self._ctx._request_and_get(
@@ -540,6 +536,20 @@ class Driver(V111Driver):
             min_interval=0.0,
             stamp_attr=f"set_cpv_{type_}:{joint_index}",
         ))
+
+    def _cpv_write_ack_received(
+        self,
+        msg: MessageAbstract[ArmMsgFeedbackCPVResponse],
+        type_: Literal['ac', 'dc', 'vv', 'pp', 'kp', 'ki'],
+    ) -> bool:
+        return msg.msg.type_value.get(type_) == 0xAC
+
+    def _clear_cpv_write_ack(
+        self,
+        msg: MessageAbstract[ArmMsgFeedbackCPVResponse],
+        type_: Literal['ac', 'dc', 'vv', 'pp', 'kp', 'ki'],
+    ) -> None:
+        msg.msg.type_value.pop(type_, None)
 
     def move_cpv_pos(
         self,
@@ -853,7 +863,7 @@ class Driver(V111Driver):
         acc: float,
         timeout: float = 1.0,
     ) -> bool:
-        """Set CPV joint acceleration and verify by read-back.
+        """Set CPV joint acceleration.
 
         Parameters
         ----------
@@ -868,7 +878,7 @@ class Driver(V111Driver):
         Returns
         -------
         bool
-            True if the read-back equals ``abs(acc)``, False otherwise.
+            True on ACK, False on timeout.
         """
         return self._set_cpv(
             joint_index=joint_index,
@@ -883,7 +893,7 @@ class Driver(V111Driver):
         dcc: float,
         timeout: float = 1.0,
     ) -> bool:
-        """Set CPV joint deceleration and verify by read-back.
+        """Set CPV joint deceleration.
 
         Parameters
         ----------
@@ -898,7 +908,7 @@ class Driver(V111Driver):
         Returns
         -------
         bool
-            True if the read-back equals ``abs(dcc)``, False otherwise.
+            True on ACK, False on timeout.
         """
         return self._set_cpv(
             joint_index=joint_index,
@@ -913,7 +923,7 @@ class Driver(V111Driver):
         cv: float,
         timeout: float = 1.0,
     ) -> bool:
-        """Set CPV contour velocity and verify by read-back.
+        """Set CPV contour velocity.
 
         Parameters
         ----------
@@ -928,7 +938,7 @@ class Driver(V111Driver):
         Returns
         -------
         bool
-            True if the read-back equals ``abs(cv)``, False otherwise.
+            True on ACK, False on timeout.
         """
         return self._set_cpv(
             joint_index=joint_index,
@@ -943,7 +953,7 @@ class Driver(V111Driver):
         pp: float,
         timeout: float = 1.0,
     ) -> bool:
-        """Set CPV position-loop Kp and verify by read-back.
+        """Set CPV position-loop Kp.
 
         Parameters
         ----------
@@ -958,7 +968,7 @@ class Driver(V111Driver):
         Returns
         -------
         bool
-            True if the read-back equals ``abs(pp)``, False otherwise.
+            True on ACK, False on timeout.
         """
         return self._set_cpv(
             joint_index=joint_index,
@@ -973,7 +983,7 @@ class Driver(V111Driver):
         kp: float,
         timeout: float = 1.0,
     ) -> bool:
-        """Set CPV velocity-loop Kp and verify by read-back.
+        """Set CPV velocity-loop Kp.
 
         Parameters
         ----------
@@ -988,7 +998,7 @@ class Driver(V111Driver):
         Returns
         -------
         bool
-            True if the read-back equals ``abs(kp)``, False otherwise.
+            True on ACK, False on timeout.
         """
         return self._set_cpv(
             joint_index=joint_index,
@@ -1003,7 +1013,7 @@ class Driver(V111Driver):
         ki: float,
         timeout: float = 1.0,
     ) -> bool:
-        """Set CPV velocity-loop Ki and verify by read-back.
+        """Set CPV velocity-loop Ki.
 
         Parameters
         ----------
@@ -1018,7 +1028,7 @@ class Driver(V111Driver):
         Returns
         -------
         bool
-            True if the read-back equals ``abs(ki)``, False otherwise.
+            True on ACK, False on timeout.
         """
         return self._set_cpv(
             joint_index=joint_index,

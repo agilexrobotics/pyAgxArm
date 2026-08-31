@@ -43,6 +43,7 @@ class ArmMsgFeedbackCPVResponse(AttributeBase):
         self.type = type
         self.value = value
         self.type_value = {}
+        self.write_ack = False
 
 
 class ArmMsgFeedbackCPVResponse1(ArmMsgFeedbackCPVResponse):

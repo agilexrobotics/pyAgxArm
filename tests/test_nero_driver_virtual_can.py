@@ -305,6 +305,51 @@ def test_nero_driver_virtual_can_cpv_timeout_when_slave_mutes_cpv():
         device.stop()
 
 
+def test_nero_v112_set_cpv_uses_structured_ack_without_readback():
+    channel = new_virtual_channel("ci_nero_cpv_v112_ack")
+    device = NeroCanSlave(channel=channel)
+    device.start()
+    try:
+        arm = _make_nero_arm(NeroFW.V112, channel)
+        arm.connect()
+
+        start = len(device.host_frames)
+        assert arm.set_cpv_acc(3, 1.25, timeout=1.0)
+
+        cpv_frames = [
+            f for f in device.host_frames[start:]
+            if f.arbitration_id == 0x183 and bytes(f.data[1:3]) == b"ac"
+        ]
+        assert any(f.data[0] == 0x77 for f in cpv_frames)
+        assert not any(f.data[0] == 0x72 for f in cpv_frames)
+        arm.disconnect()
+    finally:
+        device.stop()
+
+
+def test_nero_v120_set_cpv_uses_single_byte_ack_without_readback():
+    channel = new_virtual_channel("ci_nero_cpv_v120_ack")
+    device = NeroCanSlave(channel=channel)
+    device._cpv_write_ack_style = "single"
+    device.start()
+    try:
+        arm = _make_nero_arm(NeroFW.V120, channel)
+        arm.connect()
+
+        start = len(device.host_frames)
+        assert arm.set_cpv_acc(2, 0.888, timeout=1.0)
+
+        cpv_frames = [
+            f for f in device.host_frames[start:]
+            if f.arbitration_id == 0x182 and bytes(f.data[1:3]) == b"ac"
+        ]
+        assert any(f.data[0] == 0x77 for f in cpv_frames)
+        assert not any(f.data[0] == 0x72 for f in cpv_frames)
+        arm.disconnect()
+    finally:
+        device.stop()
+
+
 def test_nero_driver_virtual_can_cpv_each_public_api_once():
     """对 Nero 驱动文档中的 CPV 公开接口各做一次成功调用（含第 7 轴 0x187）。"""
     channel = new_virtual_channel("ci_nero_cpv_all")

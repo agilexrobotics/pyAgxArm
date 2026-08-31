@@ -369,6 +369,9 @@ class Codec:
         )
 
     def decode_cpv_response(self, m: ArmMsgFeedbackCPVResponse, d: bytearray) -> None:
+        if len(d) == 1 and d[0] == 0xAC:
+            m.write_ack = True
+            return
         mode = chr(nc.ConvertToNegative_8bit(nc.ConvertBytesToInt(d, 0, 1), False))
         if mode != "a":
             return
