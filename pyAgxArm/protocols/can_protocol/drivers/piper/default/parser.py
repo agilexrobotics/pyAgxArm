@@ -681,9 +681,12 @@ class Parser(TableDriven, ProtocolParserInterface):
         if self._config:
             k_table = self._config.get("joint_torque_k")
             b_table = self._config.get("joint_torque_b")
+            c_table = self._config.get("joint_torque_c")
             idx = joint_index - 1
-            if k_table and b_table and 0 <= idx < len(k_table) and idx < len(b_table):
-                torque_scale = k_table[idx] * b_table[idx]
+            if (k_table and 0 <= idx < len(k_table) and
+                b_table and idx < len(b_table) and
+                c_table and idx < len(c_table)):
+                torque_scale = k_table[idx] * b_table[idx] * c_table[idx]
 
         def decoder(m: ArmMsgFeedbackHighSpd, d: bytearray) -> None:
             self._codec.decode_high_spd(m, d, torque_scale=torque_scale)

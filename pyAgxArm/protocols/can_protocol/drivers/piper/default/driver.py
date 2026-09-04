@@ -1186,12 +1186,11 @@ class Driver(ArmDriverAbstract):
 
         `t_ff`: float, optional
         - Feed-forward torque reference (unit: N·m). Default is 0.0.
-          Joint 1-3: Range [-32.0, 32.0].
-            (Numerical precision: 2.509803921568627e-1 N·m)
-          Joint 4-6: Range [-8.0, 8.0].
-            (Numerical precision: 6.274509803921569e-2 N·m)
-          `piper_h` / `piper_l` / `piper_x`: per-joint `t_ff` limit ±(8×b)
-            (b from config `joint_torque_b`).
+          Per-joint `t_ff` limit: ±(8×b×c)
+            (`b` from config `joint_torque_b`; `c` from config
+            `joint_torque_c`).
+            Base `piper` example: joints 1-3 ±32.0 N·m (b=4, c=1),
+            joints 4-6 ≈±6.506 N·m (b=1, c≈0.813252).
 
         Raises
         ------
@@ -1260,7 +1259,11 @@ class Driver(ArmDriverAbstract):
             kd = Validator.clamp(kd, -5.0, 5.0)
 
         b = self._config.get("joint_torque_b")[joint_index - 1]
-        t_ff_limit = 8.0 * b
+        c = 1.0
+        c_table = self._config.get("joint_torque_c")
+        if c_table is not None:
+            c = c_table[joint_index - 1]
+        t_ff_limit = 8.0 * b * c
         t_ff_min = -t_ff_limit
         t_ff_max = t_ff_limit
 
@@ -1271,7 +1274,7 @@ class Driver(ArmDriverAbstract):
             )
             t_ff = Validator.clamp(t_ff, t_ff_min, t_ff_max)
 
-        t_ff /= b
+        t_ff = t_ff / b / c
 
         p_des = nc.FloatToUint(p_des, -12.5, 12.5, 16)
         v_des = nc.FloatToUint(v_des, -45.0, 45.0, 12)

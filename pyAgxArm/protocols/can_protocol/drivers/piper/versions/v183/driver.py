@@ -78,9 +78,9 @@ class Driver(DefaultDriver):
             (Numerical precision: 2.442002442002442e-3)
 
         `t_ff`: float, optional
-        - Feed-forward torque reference (unit: N·m). Range: [-8.0, 8.0].
-          Default is 0.0.
-            (Numerical precision: 6.274509803921569e-2 N·m)
+        - Feed-forward torque reference (unit: N·m). Default is 0.0.
+          Per-joint `t_ff` limit: ±(8×c)
+            (`c` from config `joint_torque_c`; c=1 joints keep ±8.0 N·m).
 
         Raises
         ------
@@ -148,12 +148,20 @@ class Driver(DefaultDriver):
             )
             kd = Validator.clamp(kd, -5.0, 5.0)
 
-        if not Validator.is_within_limit(t_ff, -8.0, 8.0):
+        c = 1.0
+        c_table = self._config.get("joint_torque_c")
+        if c_table is not None:
+            c = c_table[joint_index - 1]
+        t_ff_limit = 8.0 * c
+        if not Validator.is_within_limit(t_ff, -t_ff_limit, t_ff_limit):
             print(
                 f"Warning: Feed-forward torque {t_ff} N·m is outside "
-                f"joint {joint_index} limits [-8.0, 8.0]. "
+                f"joint {joint_index} limits "
+                f"[{-t_ff_limit}, {t_ff_limit}]. "
             )
-            t_ff = Validator.clamp(t_ff, -8.0, 8.0)
+            t_ff = Validator.clamp(t_ff, -t_ff_limit, t_ff_limit)
+
+        t_ff /= c
 
         p_des = nc.FloatToUint(p_des, -12.5, 12.5, 16)
         v_des = nc.FloatToUint(v_des, -45.0, 45.0, 12)

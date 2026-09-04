@@ -8,6 +8,7 @@ from .constants import (
     ROBOT_JOINT_NAME,
     ROBOT_JOINT_TORQUE_K,
     ROBOT_JOINT_TORQUE_B,
+    ROBOT_JOINT_TORQUE_C,
 )
 from ..protocols.can_protocol.comms import *
 from ..protocols.can_protocol.drivers import (
@@ -116,6 +117,10 @@ def create_agx_arm_config(
     # ---------- joint torque b ----------
     config["joint_torque_b"] = ROBOT_JOINT_TORQUE_B.get(
         robot, ROBOT_JOINT_TORQUE_B["piper"]
+    )
+    # ---------- joint torque c ----------
+    config["joint_torque_c"] = ROBOT_JOINT_TORQUE_C.get(
+        robot, ROBOT_JOINT_TORQUE_C["piper"]
     )
     # ---------- joint limit ----------
     preset_joint_limits = ROBOT_JOINT_LIMIT_PRESET.get(robot)
